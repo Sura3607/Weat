@@ -4,7 +4,7 @@
 - [x] Chốt scope MVP (đúng theo plan, không mở rộng tính năng).
 - [x] Chốt stack: Next.js + Node.js + PostgreSQL + Redis + WebSocket.
 - [x] Tạo repo cấu trúc frontend/backend và branch strategy.
-- [ ] Thiết lập CI cơ bản (lint, typecheck, test).
+- [x] Thiết lập CI cơ bản (lint, typecheck, test).
 - [ ] Tạo file env mẫu cho local/staging.
 
 ## Giai đoạn 1: Nền tảng backend
