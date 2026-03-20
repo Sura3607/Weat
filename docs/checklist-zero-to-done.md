@@ -19,8 +19,8 @@
 - [x] Hoàn thành `POST /upload-food-locket`.
 - [x] Hoàn thành `POST /current-craving`.
 - [x] Hoàn thành `GET /radar`.
-- [ ] Hoàn thành `POST /invite`.
-- [ ] Hoàn thành `POST /accept-invite`.
+- [x] Hoàn thành `POST /invite`.
+- [x] Hoàn thành `POST /accept-invite`.
 - [ ] Hoàn thành `GET /matches/{matchId}/restaurant-suggestions`.
 - [ ] Viết test API cho happy path + lỗi chính.
 
