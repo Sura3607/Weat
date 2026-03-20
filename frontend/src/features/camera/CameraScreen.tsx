@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import api from '@/shared/api/client';
+import { compressImage, uploadWithRetry } from '@/shared/lib/imageCompress';
 
 export function CameraScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -63,19 +64,28 @@ export function CameraScreen() {
           return;
         }
 
+        // Compress image before upload
+        let compressedBlob: Blob;
+        try {
+          compressedBlob = await compressImage(blob, 1280, 0.8);
+        } catch {
+          compressedBlob = blob; // Fallback to original
+        }
+
         // Show preview
-        const previewUrl = URL.createObjectURL(blob);
+        const previewUrl = URL.createObjectURL(compressedBlob);
         setLastCapture(previewUrl);
 
-        // Upload
+        // Upload with retry
         try {
-          const formData = new FormData();
-          formData.append('image', blob, 'capture.jpg');
-          formData.append('capturedAt', new Date().toISOString());
-
-          await api.post('/upload-food-locket', formData);
+          await uploadWithRetry(async () => {
+            const formData = new FormData();
+            formData.append('image', compressedBlob, 'capture.jpg');
+            formData.append('capturedAt', new Date().toISOString());
+            return api.post('/upload-food-locket', formData);
+          }, 2, 1000);
         } catch (err) {
-          console.error('Upload failed:', err);
+          console.error('Upload failed after retries:', err);
         }
 
         setIsCapturing(false);
