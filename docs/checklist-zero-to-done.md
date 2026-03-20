@@ -21,7 +21,7 @@
 - [x] Hoàn thành `GET /radar`.
 - [x] Hoàn thành `POST /invite`.
 - [x] Hoàn thành `POST /accept-invite`.
-- [ ] Hoàn thành `GET /matches/{matchId}/restaurant-suggestions`.
+- [x] Hoàn thành `GET /matches/{matchId}/restaurant-suggestions`.
 - [ ] Viết test API cho happy path + lỗi chính.
 
 ## Giai đoạn 3: Realtime
