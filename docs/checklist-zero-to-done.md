@@ -32,7 +32,7 @@
 - [x] Test realtime với 2 client đồng thời.
 
 ## Giai đoạn 4: Frontend khung chính
-- [ ] Dựng layout mobile-first max width 400px.
+- [x] Dựng layout mobile-first max width 400px.
 - [ ] Dựng CameraScreen + nút chụp chính.
 - [ ] Dựng FoodFeed dạng bottom sheet.
 - [ ] Dựng nút mở Radar và nhập craving.
