@@ -12,7 +12,7 @@
 - [x] Dựng migration + seed data tối thiểu.
 - [x] Dựng auth JWT cơ bản.
 - [x] Dựng middleware logging + error handler + requestId.
-- [ ] Dựng Redis geospatial và key convention.
+- [x] Dựng Redis geospatial và key convention.
 
 ## Giai đoạn 2: API cốt lõi
 - [ ] Hoàn thành `POST /pwa-check-in`.
