@@ -41,8 +41,8 @@
 
 ## Giai đoạn 5: Tích hợp AI và đề xuất quán
 - [x] Tích hợp OpenAI Vision cho nhận diện món.
-- [ ] Tạo job Food DNA chạy sau mỗi 3 ảnh.
-- [ ] Lưu profile preference text + vector vào Redis.
+- [x] Tạo job Food DNA chạy sau mỗi 3 ảnh.
+- [x] Lưu profile preference text + vector vào Redis.
 - [ ] Tích hợp nguồn đề xuất quán (Exa hoặc fallback local).
 
 ## Giai đoạn 6: Chất lượng và demo
