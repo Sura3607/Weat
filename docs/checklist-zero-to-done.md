@@ -10,7 +10,7 @@
 ## Giai đoạn 1: Nền tảng backend
 - [x] Thiết kế schema DB: users, friendships, food_logs, invites, matches.
 - [x] Dựng migration + seed data tối thiểu.
-- [ ] Dựng auth JWT cơ bản.
+- [x] Dựng auth JWT cơ bản.
 - [ ] Dựng middleware logging + error handler + requestId.
 - [ ] Dựng Redis geospatial và key convention.
 
