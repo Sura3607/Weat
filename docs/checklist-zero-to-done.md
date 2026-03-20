@@ -50,7 +50,7 @@
 - [x] Kiểm tra bật/tắt location tracking.
 - [x] Tối ưu upload ảnh (nén + retry hợp lý).
 - [x] Test toàn luồng trên 2 thiết bị thật.
-- [ ] Chuẩn bị script demo 3-5 phút.
+- [x] Chuẩn bị script demo 3-5 phút.
 - [ ] Chuẩn bị dữ liệu fallback/hardcode để tránh demo fail.
 
 ## Giai đoạn 7: Freeze và bàn giao
