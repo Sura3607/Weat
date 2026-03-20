@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { authMiddleware } from '../middlewares/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { findNearbyUsers } from '../services/geo.js';
-import redis, { REDIS_KEYS } from '../services/redis.js';
 import { db } from '../db/index.js';
 import { users, friendships } from '../db/schema.js';
 import { eq, or, and, inArray } from 'drizzle-orm';

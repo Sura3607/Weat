@@ -44,30 +44,36 @@ export async function findNearbyUsers(
   radiusM: number = 200,
   limit: number = 20,
 ): Promise<NearbyUser[]> {
-  // GEORADIUSBYMEMBER key member radius unit COUNT count ASC WITHDIST
-  const results = await redis.georadiusbymember(
+  // Use georadius with FROMMEMBER approach
+  // georadiusbymember returns [member, distance, member, distance, ...]
+  const results = await redis.call(
+    'GEORADIUSBYMEMBER',
     REDIS_KEYS.GEO_USERS,
     userId,
-    radiusM,
+    radiusM.toString(),
     'm',
     'COUNT',
-    limit + 1, // +1 to account for self
+    (limit + 1).toString(),
     'ASC',
     'WITHDIST',
-  );
+  ) as string[][];
 
   const nearby: NearbyUser[] = [];
 
-  for (let i = 0; i < results.length; i += 2) {
-    const memberId = results[i] as string;
-    const distance = parseFloat(results[i + 1] as string);
+  if (Array.isArray(results)) {
+    for (const item of results) {
+      if (Array.isArray(item) && item.length >= 2) {
+        const memberId = item[0] as string;
+        const distance = parseFloat(item[1] as string);
 
-    // Exclude self
-    if (memberId !== userId) {
-      nearby.push({
-        userId: memberId,
-        distanceM: Math.round(distance),
-      });
+        // Exclude self
+        if (memberId !== userId) {
+          nearby.push({
+            userId: memberId,
+            distanceM: Math.round(distance),
+          });
+        }
+      }
     }
   }
 
@@ -81,6 +87,12 @@ export async function getDistanceBetweenUsers(
   userIdA: string,
   userIdB: string,
 ): Promise<number | null> {
-  const result = await redis.geodist(REDIS_KEYS.GEO_USERS, userIdA, userIdB, 'm');
+  const result = await redis.call(
+    'GEODIST',
+    REDIS_KEYS.GEO_USERS,
+    userIdA,
+    userIdB,
+    'm',
+  ) as string | null;
   return result ? Math.round(parseFloat(result)) : null;
 }

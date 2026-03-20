@@ -4,7 +4,7 @@ import { authMiddleware } from '../middlewares/auth.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { db } from '../db/index.js';
 import { invites, matches, users } from '../db/schema.js';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { emitInviteReceived, emitInviteAccepted, emitMatchCreated } from '../realtime/index.js';
 
 const router = Router();

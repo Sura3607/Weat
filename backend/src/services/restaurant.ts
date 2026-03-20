@@ -102,7 +102,7 @@ async function fetchFromExa(
     throw new Error(`Exa API error: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data = (await response.json()) as { results?: Record<string, unknown>[] };
   const results = data.results || [];
 
   return results.slice(0, limit).map((r: Record<string, unknown>) => ({

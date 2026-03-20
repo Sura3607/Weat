@@ -1,8 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    serverActions: true,
+  eslint: {
+    // Lint is run separately in CI
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // Typecheck is run separately in CI
+    ignoreBuildErrors: false,
   },
 };
 
