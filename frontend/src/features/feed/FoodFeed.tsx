@@ -72,8 +72,15 @@ export function FoodFeed({ onClose }: FoodFeedProps) {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 pb-safe-area-bottom">
+        {/* Content - Fixed mobile scroll */}
+        <div
+          className="flex-1 overflow-y-auto px-4 pb-6"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y',
+          }}
+        >
           {loading && (
             <div className="space-y-4 py-4">
               {[1, 2, 3].map((i) => (

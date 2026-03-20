@@ -46,7 +46,7 @@
 - [x] Tích hợp nguồn đề xuất quán (Exa hoặc fallback local).
 
 ## Giai đoạn 6: Chất lượng và demo
-- [ ] Fix bug feed scroll trên mobile.
+- [x] Fix bug feed scroll trên mobile.
 - [ ] Kiểm tra bật/tắt location tracking.
 - [ ] Tối ưu upload ảnh (nén + retry hợp lý).
 - [ ] Test toàn luồng trên 2 thiết bị thật.
