@@ -16,7 +16,7 @@
 
 ## Giai đoạn 2: API cốt lõi
 - [x] Hoàn thành `POST /pwa-check-in`.
-- [ ] Hoàn thành `POST /upload-food-locket`.
+- [x] Hoàn thành `POST /upload-food-locket`.
 - [ ] Hoàn thành `POST /current-craving`.
 - [ ] Hoàn thành `GET /radar`.
 - [ ] Hoàn thành `POST /invite`.
