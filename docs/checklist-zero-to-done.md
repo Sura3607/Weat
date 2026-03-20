@@ -37,7 +37,7 @@
 - [x] Dựng FoodFeed dạng bottom sheet.
 - [x] Dựng nút mở Radar và nhập craving.
 - [x] Dựng popup nhận invite + CTA accept/reject.
-- [ ] Dựng màn Match success + CTA mở Google Maps.
+- [x] Dựng màn Match success + CTA mở Google Maps.
 
 ## Giai đoạn 5: Tích hợp AI và đề xuất quán
 - [ ] Tích hợp OpenAI Vision cho nhận diện món.
