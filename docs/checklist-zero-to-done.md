@@ -11,7 +11,7 @@
 - [x] Thiết kế schema DB: users, friendships, food_logs, invites, matches.
 - [x] Dựng migration + seed data tối thiểu.
 - [x] Dựng auth JWT cơ bản.
-- [ ] Dựng middleware logging + error handler + requestId.
+- [x] Dựng middleware logging + error handler + requestId.
 - [ ] Dựng Redis geospatial và key convention.
 
 ## Giai đoạn 2: API cốt lõi
