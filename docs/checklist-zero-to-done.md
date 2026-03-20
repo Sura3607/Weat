@@ -47,7 +47,7 @@
 
 ## Giai đoạn 6: Chất lượng và demo
 - [x] Fix bug feed scroll trên mobile.
-- [ ] Kiểm tra bật/tắt location tracking.
+- [x] Kiểm tra bật/tắt location tracking.
 - [ ] Tối ưu upload ảnh (nén + retry hợp lý).
 - [ ] Test toàn luồng trên 2 thiết bị thật.
 - [ ] Chuẩn bị script demo 3-5 phút.
