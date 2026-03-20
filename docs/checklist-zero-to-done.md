@@ -49,7 +49,7 @@
 - [x] Fix bug feed scroll trên mobile.
 - [x] Kiểm tra bật/tắt location tracking.
 - [x] Tối ưu upload ảnh (nén + retry hợp lý).
-- [ ] Test toàn luồng trên 2 thiết bị thật.
+- [x] Test toàn luồng trên 2 thiết bị thật.
 - [ ] Chuẩn bị script demo 3-5 phút.
 - [ ] Chuẩn bị dữ liệu fallback/hardcode để tránh demo fail.
 
