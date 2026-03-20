@@ -2,7 +2,7 @@
 
 ## Giai đoạn 0: Chuẩn bị dự án
 - [x] Chốt scope MVP (đúng theo plan, không mở rộng tính năng).
-- [ ] Chốt stack: Next.js + Node.js + PostgreSQL + Redis + WebSocket.
+- [x] Chốt stack: Next.js + Node.js + PostgreSQL + Redis + WebSocket.
 - [ ] Tạo repo cấu trúc frontend/backend và branch strategy.
 - [ ] Thiết lập CI cơ bản (lint, typecheck, test).
 - [ ] Tạo file env mẫu cho local/staging.
