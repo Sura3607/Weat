@@ -1,7 +1,7 @@
 # Checklist Triển Khai Tuần Tự (Zero -> Done)
 
 ## Giai đoạn 0: Chuẩn bị dự án
-- [ ] Chốt scope MVP (đúng theo plan, không mở rộng tính năng).
+- [x] Chốt scope MVP (đúng theo plan, không mở rộng tính năng).
 - [ ] Chốt stack: Next.js + Node.js + PostgreSQL + Redis + WebSocket.
 - [ ] Tạo repo cấu trúc frontend/backend và branch strategy.
 - [ ] Thiết lập CI cơ bản (lint, typecheck, test).
