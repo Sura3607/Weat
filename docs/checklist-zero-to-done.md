@@ -33,7 +33,7 @@
 
 ## Giai đoạn 4: Frontend khung chính
 - [x] Dựng layout mobile-first max width 400px.
-- [ ] Dựng CameraScreen + nút chụp chính.
+- [x] Dựng CameraScreen + nút chụp chính.
 - [ ] Dựng FoodFeed dạng bottom sheet.
 - [ ] Dựng nút mở Radar và nhập craving.
 - [ ] Dựng popup nhận invite + CTA accept/reject.

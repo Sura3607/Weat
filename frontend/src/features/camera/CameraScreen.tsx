@@ -1,0 +1,153 @@
+'use client';
+
+import { useRef, useState, useCallback, useEffect } from 'react';
+import api from '@/shared/api/client';
+
+export function CameraScreen() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [lastCapture, setLastCapture] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize camera
+  useEffect(() => {
+    async function startCamera() {
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 1280 },
+          },
+          audio: false,
+        });
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      } catch (err) {
+        setError('Không thể truy cập camera. Vui lòng cấp quyền.');
+      }
+    }
+
+    startCamera();
+
+    return () => {
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  // Capture photo
+  const handleCapture = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || isCapturing) return;
+
+    setIsCapturing(true);
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0);
+
+    // Convert to blob
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          setIsCapturing(false);
+          return;
+        }
+
+        // Show preview
+        const previewUrl = URL.createObjectURL(blob);
+        setLastCapture(previewUrl);
+
+        // Upload
+        try {
+          const formData = new FormData();
+          formData.append('image', blob, 'capture.jpg');
+          formData.append('capturedAt', new Date().toISOString());
+
+          await api.post('/upload-food-locket', formData);
+        } catch (err) {
+          console.error('Upload failed:', err);
+        }
+
+        setIsCapturing(false);
+
+        // Clear preview after 2 seconds
+        setTimeout(() => {
+          setLastCapture(null);
+          URL.revokeObjectURL(previewUrl);
+        }, 2000);
+      },
+      'image/jpeg',
+      0.85,
+    );
+  }, [isCapturing]);
+
+  if (error) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-black">
+        <div className="text-center px-8">
+          <p className="text-white/80 text-sm mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-white/20 px-6 py-2 rounded-full text-sm"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full bg-black">
+      {/* Camera Video */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="h-full w-full object-cover"
+      />
+
+      {/* Hidden canvas for capture */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* Flash effect on capture */}
+      {lastCapture && (
+        <div className="absolute inset-0 bg-white animate-fade-in opacity-0 pointer-events-none" />
+      )}
+
+      {/* Preview thumbnail */}
+      {lastCapture && (
+        <div className="absolute top-20 right-4 w-16 h-16 rounded-lg overflow-hidden border-2 border-white/50 animate-slide-up z-20">
+          <img src={lastCapture} alt="Captured" className="w-full h-full object-cover" />
+        </div>
+      )}
+
+      {/* Capture Button */}
+      <div className="absolute bottom-8 left-0 right-0 flex justify-center z-10">
+        <button
+          onClick={handleCapture}
+          disabled={isCapturing}
+          className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform"
+          aria-label="Chụp ảnh món ăn"
+        >
+          <div
+            className={`w-16 h-16 rounded-full bg-white transition-all ${
+              isCapturing ? 'scale-75 bg-red-500' : ''
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
