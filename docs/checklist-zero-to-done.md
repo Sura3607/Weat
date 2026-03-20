@@ -5,7 +5,7 @@
 - [x] Chốt stack: Next.js + Node.js + PostgreSQL + Redis + WebSocket.
 - [x] Tạo repo cấu trúc frontend/backend và branch strategy.
 - [x] Thiết lập CI cơ bản (lint, typecheck, test).
-- [ ] Tạo file env mẫu cho local/staging.
+- [x] Tạo file env mẫu cho local/staging.
 
 ## Giai đoạn 1: Nền tảng backend
 - [ ] Thiết kế schema DB: users, friendships, food_logs, invites, matches.
