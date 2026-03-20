@@ -54,7 +54,7 @@
 - [x] Chuẩn bị dữ liệu fallback/hardcode để tránh demo fail.
 
 ## Giai đoạn 7: Freeze và bàn giao
-- [ ] Freeze feature trước giờ demo.
+- [x] Freeze feature trước giờ demo.
 - [ ] Chốt known issues và workaround.
 - [ ] Chốt tài liệu: plan, endpoints, frontend standards, checklist.
 - [ ] Tag release demo.
