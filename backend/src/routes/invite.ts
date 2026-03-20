@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import { db } from '../db/index.js';
 import { invites, matches, users } from '../db/schema.js';
 import { eq, and, or } from 'drizzle-orm';
+import { emitInviteReceived, emitInviteAccepted, emitMatchCreated } from '../realtime/index.js';
 
 const router = Router();
 
@@ -74,7 +75,21 @@ router.post('/invite', authMiddleware, async (req: Request, res: Response) => {
       })
       .returning();
 
-    // TODO: Emit WebSocket event invite.received (Phase 3)
+    // Get sender display name for the event
+    const [fromUser] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, fromUserId))
+      .limit(1);
+
+    // Emit WebSocket event invite.received
+    emitInviteReceived(toUserId, {
+      inviteId: invite.id,
+      fromUserId,
+      fromDisplayName: fromUser?.displayName || 'Someone',
+      dishName,
+      message: message || null,
+    });
 
     sendSuccess(res, req, {
       inviteId: invite.id,
@@ -144,7 +159,28 @@ router.post('/accept-invite', authMiddleware, async (req: Request, res: Response
       })
       .returning();
 
-    // TODO: Emit WebSocket events invite.accepted + match.created (Phase 3)
+    // Get acceptor display name
+    const [acceptor] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    // Emit invite.accepted to the invite sender
+    emitInviteAccepted(invite.fromUserId, {
+      inviteId: invite.id,
+      acceptedByUserId: userId,
+      acceptedByDisplayName: acceptor?.displayName || 'Someone',
+    });
+
+    // Emit match.created to both users
+    emitMatchCreated([invite.fromUserId, userId], {
+      matchId: match.id,
+      inviteId: invite.id,
+      userAId: invite.fromUserId,
+      userBId: userId,
+      dishName: invite.dishName,
+    });
 
     sendSuccess(res, req, {
       inviteId: invite.id,

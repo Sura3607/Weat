@@ -26,9 +26,9 @@
 
 ## Giai đoạn 3: Realtime
 - [x] Dựng WebSocket gateway + auth handshake.
-- [ ] Emit event `invite.received`.
-- [ ] Emit event `invite.accepted`.
-- [ ] Emit event `match.created`.
+- [x] Emit event `invite.received`.
+- [x] Emit event `invite.accepted`.
+- [x] Emit event `match.created`.
 - [ ] Test realtime với 2 client đồng thời.
 
 ## Giai đoạn 4: Frontend khung chính
