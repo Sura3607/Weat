@@ -43,7 +43,7 @@
 - [x] Tích hợp OpenAI Vision cho nhận diện món.
 - [x] Tạo job Food DNA chạy sau mỗi 3 ảnh.
 - [x] Lưu profile preference text + vector vào Redis.
-- [ ] Tích hợp nguồn đề xuất quán (Exa hoặc fallback local).
+- [x] Tích hợp nguồn đề xuất quán (Exa hoặc fallback local).
 
 ## Giai đoạn 6: Chất lượng và demo
 - [ ] Fix bug feed scroll trên mobile.
