@@ -35,7 +35,7 @@
 - [x] Dựng layout mobile-first max width 400px.
 - [x] Dựng CameraScreen + nút chụp chính.
 - [x] Dựng FoodFeed dạng bottom sheet.
-- [ ] Dựng nút mở Radar và nhập craving.
+- [x] Dựng nút mở Radar và nhập craving.
 - [ ] Dựng popup nhận invite + CTA accept/reject.
 - [ ] Dựng màn Match success + CTA mở Google Maps.
 
