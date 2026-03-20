@@ -20,6 +20,7 @@ import inviteRoutes from './routes/invite.js';
 import matchRoutes from './routes/match.js';
 import feedRoutes from './routes/feed.js';
 import healthRoutes from './routes/health.js';
+import { initWebSocket } from './realtime/index.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -46,8 +47,11 @@ app.use('/api/v1', feedRoutes);
 // Error handler (must be last)
 app.use(errorHandler);
 
-// Export for WebSocket setup and testing
-export { app, httpServer };
+// Initialize WebSocket
+const io = initWebSocket(httpServer);
+
+// Export for testing
+export { app, httpServer, io };
 
 // Start server
 httpServer.listen(config.port, () => {

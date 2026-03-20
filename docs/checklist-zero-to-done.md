@@ -25,7 +25,7 @@
 - [x] Viết test API cho happy path + lỗi chính.
 
 ## Giai đoạn 3: Realtime
-- [ ] Dựng WebSocket gateway + auth handshake.
+- [x] Dựng WebSocket gateway + auth handshake.
 - [ ] Emit event `invite.received`.
 - [ ] Emit event `invite.accepted`.
 - [ ] Emit event `match.created`.
