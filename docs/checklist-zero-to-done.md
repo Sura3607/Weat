@@ -8,7 +8,7 @@
 - [x] Tạo file env mẫu cho local/staging.
 
 ## Giai đoạn 1: Nền tảng backend
-- [ ] Thiết kế schema DB: users, friendships, food_logs, invites, matches.
+- [x] Thiết kế schema DB: users, friendships, food_logs, invites, matches.
 - [ ] Dựng migration + seed data tối thiểu.
 - [ ] Dựng auth JWT cơ bản.
 - [ ] Dựng middleware logging + error handler + requestId.
