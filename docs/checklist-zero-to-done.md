@@ -40,7 +40,7 @@
 - [x] Dựng màn Match success + CTA mở Google Maps.
 
 ## Giai đoạn 5: Tích hợp AI và đề xuất quán
-- [ ] Tích hợp OpenAI Vision cho nhận diện món.
+- [x] Tích hợp OpenAI Vision cho nhận diện món.
 - [ ] Tạo job Food DNA chạy sau mỗi 3 ảnh.
 - [ ] Lưu profile preference text + vector vào Redis.
 - [ ] Tích hợp nguồn đề xuất quán (Exa hoặc fallback local).

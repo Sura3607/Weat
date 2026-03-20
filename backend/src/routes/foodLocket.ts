@@ -8,6 +8,8 @@ import { db } from '../db/index.js';
 import { foodLogs } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import { config } from '../config/env.js';
+import { analyzeFoodImage } from '../services/vision.js';
+import { enqueueFoodDnaRefresh } from '../jobs/foodDna.js';
 
 const router = Router();
 
@@ -54,11 +56,19 @@ router.post(
         ? new Date(req.body.capturedAt)
         : new Date();
 
-      // Placeholder: AI vision analysis will be integrated in Phase 5
-      // For now, use placeholder values
-      const dishName = 'Analyzing...';
-      const confidence = 0;
-      const tags: string[] = [];
+      // AI Vision analysis
+      let dishName = 'Analyzing...';
+      let confidence = 0;
+      let tags: string[] = [];
+
+      try {
+        const visionResult = await analyzeFoodImage(req.file.path);
+        dishName = visionResult.dishName;
+        confidence = visionResult.confidence;
+        tags = visionResult.tags;
+      } catch {
+        // Fallback to placeholder if vision fails
+      }
 
       // Save food log
       const [foodLog] = await db
@@ -83,7 +93,10 @@ router.post(
       const totalPhotos = Number(countResult[0]?.count || 0);
       const shouldRefreshDna = totalPhotos % 3 === 0 && totalPhotos > 0;
 
-      // TODO: Enqueue food-dna-refresh job when AI is integrated (Phase 5)
+      // Enqueue food-dna-refresh job if threshold met
+      if (shouldRefreshDna) {
+        enqueueFoodDnaRefresh(userId).catch(() => {});
+      }
 
       sendSuccess(res, req, {
         foodLogId: foodLog.id,
