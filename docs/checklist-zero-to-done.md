@@ -57,11 +57,11 @@
 - [x] Freeze feature trước giờ demo.
 - [x] Chốt known issues và workaround.
 - [x] Chốt tài liệu: plan, endpoints, frontend standards, checklist.
-- [ ] Tag release demo.
+- [x] Tag release demo.
 
 ## Tiêu chí Done toàn dự án
-- [ ] User A và User B check-in thấy nhau trong radar theo bán kính.
-- [ ] User A gửi invite và User B nhận realtime trong vài giây.
-- [ ] User B accept và cả hai thấy hiệu ứng Match.
-- [ ] Có ít nhất 1 quán gợi ý mở được Google Maps.
-- [ ] Demo chạy ổn định ít nhất 3 lần liên tiếp.
+- [x] User A và User B check-in thấy nhau trong radar theo bán kính.
+- [x] User A gửi invite và User B nhận realtime trong vài giây.
+- [x] User B accept và cả hai thấy hiệu ứng Match.
+- [x] Có ít nhất 1 quán gợi ý mở được Google Maps.
+- [x] Demo chạy ổn định ít nhất 3 lần liên tiếp.
