@@ -21,9 +21,14 @@ RUN npx tsc
 # Production stage
 FROM node:22-alpine AS prod
 WORKDIR /app
+ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/db ./db
+# Keep src for migration/seed scripts (tsx can run them)
+COPY --from=build /app/src ./src
+COPY --from=build /app/node_modules/.package-lock.json ./
+RUN mkdir -p /app/uploads
 EXPOSE 4000
 CMD ["node", "dist/index.js"]

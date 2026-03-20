@@ -19,7 +19,7 @@ export interface RealtimeEvent {
 export function initWebSocket(httpServer: HttpServer): Server {
   io = new Server(httpServer, {
     cors: {
-      origin: config.cors.origin,
+      origin: config.cors.origin as string | string[] | boolean,
       credentials: true,
     },
     path: '/ws',

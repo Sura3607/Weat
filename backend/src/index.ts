@@ -27,7 +27,7 @@ const httpServer = createServer(app);
 
 // Global middleware
 app.use(helmet());
-app.use(cors({ origin: config.cors.origin, credentials: true }));
+app.use(cors({ origin: config.cors.origin as string | string[] | boolean, credentials: true }));
 app.use(compression());
 app.use(express.json());
 app.use(requestIdMiddleware);
@@ -44,6 +44,9 @@ app.use('/api/v1', inviteRoutes);
 app.use('/api/v1', matchRoutes);
 app.use('/api/v1', feedRoutes);
 
+// Serve uploaded files
+app.use('/uploads', express.static(config.upload.dir));
+
 // Error handler (must be last)
 app.use(errorHandler);
 
@@ -54,6 +57,6 @@ const io = initWebSocket(httpServer);
 export { app, httpServer, io };
 
 // Start server
-httpServer.listen(config.port, () => {
-  logger.info(`Weat API running on port ${config.port} [${config.nodeEnv}]`);
+httpServer.listen(config.port, '0.0.0.0', () => {
+  logger.info(`Weat API running on 0.0.0.0:${config.port} [${config.nodeEnv}]`);
 });

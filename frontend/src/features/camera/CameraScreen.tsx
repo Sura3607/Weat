@@ -7,13 +7,16 @@ import { compressImage, uploadWithRetry } from '@/shared/lib/imageCompress';
 export function CameraScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [lastCapture, setLastCapture] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   // Initialize camera
   useEffect(() => {
+    let cancelled = false;
+
     async function startCamera() {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -24,25 +27,38 @@ export function CameraScreen() {
           },
           audio: false,
         });
-        setStream(mediaStream);
+
+        if (cancelled) {
+          mediaStream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        streamRef.current = mediaStream;
         if (videoRef.current) {
           videoRef.current.srcObject = mediaStream;
+          videoRef.current.onloadedmetadata = () => {
+            setCameraReady(true);
+          };
         }
-      } catch (err) {
-        setError('Không thể truy cập camera. Vui lòng cấp quyền.');
+      } catch {
+        if (!cancelled) {
+          setError('Không thể truy cập camera. Vui lòng cấp quyền.');
+        }
       }
     }
 
     startCamera();
 
     return () => {
-      stream?.getTracks().forEach((track) => track.stop());
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     };
   }, []);
 
   // Capture photo
   const handleCapture = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || isCapturing) return;
+    if (!videoRef.current || !canvasRef.current || isCapturing || !cameraReady) return;
 
     setIsCapturing(true);
     const video = videoRef.current;
@@ -52,7 +68,10 @@ export function CameraScreen() {
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      setIsCapturing(false);
+      return;
+    }
 
     ctx.drawImage(video, 0, 0);
 
@@ -99,7 +118,7 @@ export function CameraScreen() {
       'image/jpeg',
       0.85,
     );
-  }, [isCapturing]);
+  }, [isCapturing, cameraReady]);
 
   if (error) {
     return (
@@ -147,8 +166,8 @@ export function CameraScreen() {
       <div className="absolute bottom-8 left-0 right-0 flex justify-center z-10">
         <button
           onClick={handleCapture}
-          disabled={isCapturing}
-          className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform"
+          disabled={isCapturing || !cameraReady}
+          className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform disabled:opacity-50"
           aria-label="Chụp ảnh món ăn"
         >
           <div

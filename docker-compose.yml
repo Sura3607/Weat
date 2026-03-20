@@ -1,9 +1,10 @@
-# ── Weat Docker Compose ───────────────────────────────────
+# ── Weat Docker Compose (Development) ────────────────────
 # Usage:
-#   docker compose up -d          # Start all services
-#   docker compose logs -f        # View logs
-#   docker compose down -v        # Stop and remove volumes
-#   docker compose up -d --build  # Rebuild and start
+#   docker compose up -d --build     # Build and start all
+#   docker compose exec backend npx tsx src/db/migrate.ts  # Run migration
+#   docker compose exec backend npx tsx src/db/seed.ts     # Seed data
+#   docker compose logs -f           # View logs
+#   docker compose down -v           # Stop and remove volumes
 
 services:
   # ── PostgreSQL ──────────────────────────────────────────
@@ -58,7 +59,7 @@ services:
       JWT_EXPIRES_IN: 7d
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       EXA_API_KEY: ${EXA_API_KEY:-}
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGIN: "*"
       MAX_FILE_SIZE_MB: 8
       UPLOAD_DIR: ./uploads
     volumes:
@@ -72,7 +73,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/api/v1/health || exit 1"]
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:4000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 5

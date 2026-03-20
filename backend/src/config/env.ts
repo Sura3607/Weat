@@ -16,10 +16,19 @@ export const config = {
     apiKey: process.env.EXA_API_KEY || '',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    // Support comma-separated origins or wildcard '*'
+    origin: parseCorsOrigin(process.env.CORS_ORIGIN || 'http://localhost:3000'),
   },
   upload: {
     maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '8', 10),
     dir: process.env.UPLOAD_DIR || './uploads',
   },
 } as const;
+
+function parseCorsOrigin(raw: string): string | string[] | boolean {
+  if (raw === '*') return true; // Allow all origins
+  if (raw.includes(',')) {
+    return raw.split(',').map((s) => s.trim());
+  }
+  return raw;
+}
