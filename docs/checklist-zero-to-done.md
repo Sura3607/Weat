@@ -56,7 +56,7 @@
 ## Giai đoạn 7: Freeze và bàn giao
 - [x] Freeze feature trước giờ demo.
 - [x] Chốt known issues và workaround.
-- [ ] Chốt tài liệu: plan, endpoints, frontend standards, checklist.
+- [x] Chốt tài liệu: plan, endpoints, frontend standards, checklist.
 - [ ] Tag release demo.
 
 ## Tiêu chí Done toàn dự án
