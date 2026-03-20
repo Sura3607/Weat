@@ -29,7 +29,7 @@
 - [x] Emit event `invite.received`.
 - [x] Emit event `invite.accepted`.
 - [x] Emit event `match.created`.
-- [ ] Test realtime với 2 client đồng thời.
+- [x] Test realtime với 2 client đồng thời.
 
 ## Giai đoạn 4: Frontend khung chính
 - [ ] Dựng layout mobile-first max width 400px.
