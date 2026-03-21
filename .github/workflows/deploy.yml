@@ -39,7 +39,7 @@ jobs:
             git pull origin main 
 
             # Dọn thư mục local nặng để giảm Docker build context
-            rm -rf .pnpm-store .manus .manus-logs
+            sudo rm -rf .pnpm-store .manus .manus-logs
             
             # (Tùy chọn) Chạy cập nhật database nếu có bảng mới
             sudo docker run --rm --env-file .env -v $(pwd):/app -w /app node:22-alpine sh -c "corepack enable && pnpm install && pnpm run db:push"
