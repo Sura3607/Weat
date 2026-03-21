@@ -117,3 +117,16 @@ export const postReactions = mysqlTable("post_reactions", {
 
 export type PostReaction = typeof postReactions.$inferSelect;
 export type InsertPostReaction = typeof postReactions.$inferInsert;
+
+// ─── Ratings ───────────────────────────────────────────────────────
+export const ratings = mysqlTable("ratings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  foodLogId: int("foodLogId").notNull(),
+  stars: int("stars").notNull(), // 1-5 stars
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Rating = typeof ratings.$inferSelect;
+export type InsertRating = typeof ratings.$inferInsert;
