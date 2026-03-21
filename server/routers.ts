@@ -357,6 +357,16 @@ Return ONLY valid JSON, no markdown.`;
         const { limit = 50, offset = 0 } = input || {};
         return db.getFoodLogsByUser(ctx.user.id, limit, offset);
       }),
+
+    delete: protectedProcedure
+      .input(z.object({ logId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const deleted = await db.deleteFoodLog(input.logId, ctx.user.id);
+        if (!deleted) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Post not found or not yours" });
+        }
+        return { success: true };
+      }),
   }),
 
   // ─── Radar ───────────────────────────────────────────────────────
@@ -522,6 +532,78 @@ Return ONLY valid JSON, no markdown.`;
           rating: p.rating,
           totalRatings: p.user_ratings_total,
         }));
+      }),
+  }),
+
+  // ─── Chat ────────────────────────────────────────────────────────
+  chat: router({
+    send: protectedProcedure
+      .input(z.object({
+        receiverId: z.number(),
+        content: z.string().min(1).max(2000),
+        matchInviteId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const msgId = await db.createChatMessage({
+          senderId: ctx.user.id,
+          receiverId: input.receiverId,
+          content: input.content,
+          matchInviteId: input.matchInviteId || null,
+        });
+
+        // Send real-time notification via WebSocket
+        sendToUser(input.receiverId, {
+          type: "chat_message",
+          messageId: msgId,
+          senderId: ctx.user.id,
+          senderName: ctx.user.name,
+          senderAvatar: ctx.user.avatarUrl,
+          content: input.content,
+        });
+
+        return { messageId: msgId };
+      }),
+
+    messages: protectedProcedure
+      .input(z.object({
+        otherUserId: z.number(),
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        // Mark messages as read
+        await db.markMessagesAsRead(ctx.user.id, input.otherUserId);
+        return db.getChatMessages(ctx.user.id, input.otherUserId, input.limit, input.offset);
+      }),
+  }),
+
+  // ─── Reactions ───────────────────────────────────────────────────
+  reaction: router({
+    add: protectedProcedure
+      .input(z.object({
+        foodLogId: z.number(),
+        emoji: z.string().min(1).max(32),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.addPostReaction({
+          foodLogId: input.foodLogId,
+          userId: ctx.user.id,
+          emoji: input.emoji,
+        });
+        return { id };
+      }),
+
+    remove: protectedProcedure
+      .input(z.object({ foodLogId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.removePostReaction(input.foodLogId, ctx.user.id);
+        return { success: true };
+      }),
+
+    getForPost: protectedProcedure
+      .input(z.object({ foodLogId: z.number() }))
+      .query(async ({ input }) => {
+        return db.getPostReactions(input.foodLogId);
       }),
   }),
 

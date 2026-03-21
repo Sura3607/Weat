@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { MessageCircle } from "lucide-react";
 
 export default function NotificationHandler() {
   const { user } = useAuth();
@@ -55,10 +56,23 @@ export default function NotificationHandler() {
 
     if (lastMessage.type === "match_response") {
       if (lastMessage.accepted) {
-        toast.success(`${lastMessage.responderName || "Ai đó"} đã đồng ý ăn cùng bạn!`);
+        toast.success(`${lastMessage.responderName || "Ai đó"} đã đồng ý ăn cùng bạn! 🎉`);
       } else {
         toast.info(`${lastMessage.responderName || "Ai đó"} đã từ chối lời mời.`);
       }
+    }
+
+    if (lastMessage.type === "chat_message") {
+      toast(
+        <div className="flex items-start gap-2">
+          <MessageCircle className="w-4 h-4 text-terracotta mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium text-sm">{lastMessage.senderName || "Ai đó"}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2">{lastMessage.content}</p>
+          </div>
+        </div>,
+        { duration: 5000 }
+      );
     }
   }, [lastMessage]);
 

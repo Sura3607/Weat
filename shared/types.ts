@@ -42,4 +42,5 @@ export type VenueSuggestion = {
 
 export type WsMessage =
   | { type: "match_invite"; inviteId: number; senderId: number; senderName: string | null; senderAvatar: string | null; craving: string | null; venueName: string | null }
-  | { type: "match_response"; inviteId: number; responderId: number; responderName: string | null; accepted: boolean };
+  | { type: "match_response"; inviteId: number; responderId: number; responderName: string | null; accepted: boolean }
+  | { type: "chat_message"; messageId: number; senderId: number; senderName: string | null; senderAvatar: string | null; content: string };

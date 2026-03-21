@@ -17,11 +17,19 @@ export default function CravingDialog({ open, onOpenChange }: Props) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  const utils = trpc.useUtils();
+
   const setCravingMutation = trpc.craving.set.useMutation({
     onSuccess: () => {
       toast.success(`Đã lưu: "${craving}"`);
+      // Invalidate profile and radar queries so craving shows up immediately
+      utils.profile.get.invalidate();
+      utils.radar.nearby.invalidate();
       onOpenChange(false);
       setCraving("");
+    },
+    onError: () => {
+      toast.error("Không thể lưu craving");
     },
   });
 
@@ -74,7 +82,7 @@ export default function CravingDialog({ open, onOpenChange }: Props) {
     setIsRecording(false);
   }, []);
 
-  const suggestions = ["Bún Bò", "Phở", "Cơm Tấm", "Bánh Mì", "Trà Sữa", "Pizza"];
+  const suggestions = ["Bún Bò", "Phở", "Cơm Tấm", "Bánh Mì", "Trà Sữa", "Pizza", "Sushi", "Gỏi Cuốn"];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -84,6 +92,9 @@ export default function CravingDialog({ open, onOpenChange }: Props) {
             <Utensils className="w-5 h-5 text-terracotta" />
             Bạn đang thèm gì?
           </DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Nhập hoặc nói tên món bạn đang thèm. Trạng thái sẽ hiển thị trên Radar.
+          </p>
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
@@ -91,14 +102,14 @@ export default function CravingDialog({ open, onOpenChange }: Props) {
             <Input
               value={craving}
               onChange={(e) => setCraving(e.target.value)}
-              placeholder="VD: Bún Bò Huế..."
+              placeholder="VD: Bún Bò Huế, Pizza, Trà Sữa..."
               className="rounded-xl bg-card border-border"
               onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
             />
             <button
               onClick={isRecording ? stopRecording : startRecording}
               className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                isRecording ? "bg-destructive text-white" : "bg-terracotta/10 text-terracotta"
+                isRecording ? "bg-destructive text-white animate-pulse" : "bg-terracotta/10 text-terracotta"
               }`}
             >
               {transcribeMutation.isPending ? (
@@ -112,16 +123,19 @@ export default function CravingDialog({ open, onOpenChange }: Props) {
           </div>
 
           {/* Quick suggestions */}
-          <div className="flex flex-wrap gap-2">
-            {suggestions.map((s) => (
-              <button
-                key={s}
-                onClick={() => setCraving(s)}
-                className="text-xs px-3 py-1.5 rounded-full bg-ochre-light text-foreground hover:bg-ochre/30 transition-colors"
-              >
-                {s}
-              </button>
-            ))}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Gợi ý nhanh:</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setCraving(s)}
+                  className="text-xs px-3 py-1.5 rounded-full bg-ochre-light text-foreground hover:bg-ochre/30 transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
 
           <Button

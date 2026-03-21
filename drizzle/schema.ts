@@ -91,3 +91,29 @@ export const matchInvites = mysqlTable("match_invites", {
 
 export type MatchInvite = typeof matchInvites.$inferSelect;
 export type InsertMatchInvite = typeof matchInvites.$inferInsert;
+
+// ─── Chat Messages ──────────────────────────────────────────────────
+export const chatMessages = mysqlTable("chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  senderId: int("senderId").notNull(),
+  receiverId: int("receiverId").notNull(),
+  content: text("content").notNull(),
+  matchInviteId: int("matchInviteId"),
+  isRead: boolean("isRead").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+// ─── Post Reactions ─────────────────────────────────────────────────
+export const postReactions = mysqlTable("post_reactions", {
+  id: int("id").autoincrement().primaryKey(),
+  foodLogId: int("foodLogId").notNull(),
+  userId: int("userId").notNull(),
+  emoji: varchar("emoji", { length: 32 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PostReaction = typeof postReactions.$inferSelect;
+export type InsertPostReaction = typeof postReactions.$inferInsert;
