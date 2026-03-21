@@ -14,8 +14,8 @@ export default function BottomNav() {
   const [location, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  // Hide on camera page and home page (before login)
-  if (location === "/camera" || location === "/") return null;
+  // Hide on camera page, home page, and onboarding page
+  if (location === "/camera" || location === "/" || location === "/onboarding") return null;
 
   const handleNavClick = (path: string) => {
     // If already on this page, trigger a data refresh

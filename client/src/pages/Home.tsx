@@ -2,26 +2,49 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
 import { Camera, MapPin, Radio, Utensils, ChevronRight, Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import SplashScreen from "./SplashScreen";
+import AuthPage from "./AuthPage";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const [showSplash, setShowSplash] = useState(true);
+  const [showAuth, setShowAuth] = useState(false);
 
-  // Redirect authenticated users to feed - must be in useEffect to avoid setState-in-render
+  // Redirect authenticated users to feed
   useEffect(() => {
     if (!loading && isAuthenticated) {
       navigate("/feed");
     }
   }, [loading, isAuthenticated, navigate]);
 
-  if (loading || isAuthenticated) {
+  // Handle splash screen flow
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      const timer = setTimeout(() => {
+        setShowSplash(false);
+        setShowAuth(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isAuthenticated]);
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-terracotta" />
       </div>
     );
+  }
+
+  if (showSplash) {
+    return <SplashScreen onComplete={() => {}} />;
+  }
+
+  if (showAuth) {
+    return <AuthPage onComplete={() => {}} />;
   }
 
   return (

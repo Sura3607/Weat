@@ -20,7 +20,10 @@ export default function RegisterPage() {
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: async () => {
       await refetch();
-      setLocation("/feed");
+      // Set flag to indicate this is a new user who should go through onboarding
+      localStorage.setItem("weat-first-time", "true");
+      localStorage.removeItem("onboardingComplete");
+      setLocation("/onboarding");
     },
     onError: (err) => {
       setError(err.message || "Registration failed");

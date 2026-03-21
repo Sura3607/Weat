@@ -42,9 +42,73 @@ interface Reaction {
   userAvatar: string | null;
 }
 
+interface FoodLog {
+  id: number;
+  userId: number;
+  userName: string | null;
+  userAvatar: string | null;
+  imageUrl: string;
+  dishName: string | null;
+  dishNameVi: string | null;
+  locationName: string | null;
+  calories: number | null;
+  tags: string[] | null;
+  voiceNote: string | null;
+  createdAt: Date;
+}
+
+// Mock data for feed when no real data is available
+const MOCK_LOGS: FoodLog[] = [
+  {
+    id: 101,
+    userId: 201,
+    userName: "Minh Anh",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&h=600&fit=crop",
+    dishName: "Curry",
+    dishNameVi: "Cà ri",
+    locationName: "Tokyo, Japan",
+    calories: 450,
+    tags: ["spicy", "japanese", "rice"],
+    voiceNote: "Thơm ngon, cay vừa phải!",
+    createdAt: new Date(Date.now() - 1000 * 60 * 30),
+  },
+  {
+    id: 102,
+    userId: 202,
+    userName: "Hoàng Nam",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&h=600&fit=crop",
+    dishName: "Phở",
+    dishNameVi: "Phở bò",
+    locationName: "Hà Nội, Việt Nam",
+    calories: 380,
+    tags: ["vietnamese", "noodles", "soup"],
+    voiceNote: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+  },
+  {
+    id: 103,
+    userId: 203,
+    userName: "Lan Phương",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=600&fit=crop",
+    dishName: "Pizza",
+    dishNameVi: "Pizza Margherita",
+    locationName: "Hồ Chí Minh, Việt Nam",
+    calories: 620,
+    tags: ["italian", "pizza", "cheese"],
+    voiceNote: "Pizza nóng hổi vừa thổi vừa ăn!",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+  },
+];
+
 export default function FeedPage() {
   const { user } = useAuth();
   const { data: logs, isLoading, refetch } = trpc.foodLog.feed.useQuery({ limit: 50, offset: 0 });
+
+  // Use mock data if no real data is available
+  const displayLogs = logs && logs.length > 0 ? logs : MOCK_LOGS;
 
   // Profile sheet state
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
@@ -78,7 +142,7 @@ export default function FeedPage() {
           userId: user!.id,
           emoji: variables.emoji,
           userName: user?.name || null,
-          userAvatar: user?.avatar || null,
+          userAvatar: user?.avatarUrl || null,
         };
         return {
           ...prev,
@@ -103,11 +167,12 @@ export default function FeedPage() {
 
   // Load reactions for each post when logs change
   useEffect(() => {
-    if (!logs?.length) return;
+    const logsToUse = logs && logs.length > 0 ? logs : MOCK_LOGS;
+    if (!logsToUse.length) return;
     
     const loadReactions = async () => {
       const reactionsMap: Record<number, Reaction[]> = {};
-      for (const log of logs) {
+      for (const log of logsToUse) {
         try {
           const reactions = await utils.reaction.getForPost.fetch({ foodLogId: log.id });
           reactionsMap[log.id] = reactions;
@@ -152,7 +217,7 @@ export default function FeedPage() {
   };
 
   return (
-    <div className="page-enter pb-24">
+    <div className="page-enter pb-24 max-w-md mx-auto">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3">
         <h1 className="text-xl font-bold text-foreground">Feed</h1>
@@ -175,14 +240,7 @@ export default function FeedPage() {
           </>
         )}
 
-        {logs && logs.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground text-lg">Chưa có food log nào</p>
-            <p className="text-muted-foreground text-sm mt-1">Hãy chụp ảnh món ăn đầu tiên!</p>
-          </div>
-        )}
-
-        {logs?.map((log) => {
+        {displayLogs.map((log) => {
           const isOwner = user && log.userId === user.id;
           const reactions = postReactions[log.id] || [];
 
