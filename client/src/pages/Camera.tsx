@@ -21,6 +21,8 @@ export default function CameraPage() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [voiceNote, setVoiceNote] = useState<string>("");
+  const [caption, setCaption] = useState<string>("");
+  const [rating, setRating] = useState<number | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [validationState, setValidationState] = useState<ValidationState>("idle");
   const [validationReason, setValidationReason] = useState<string>("");
@@ -164,6 +166,8 @@ export default function CameraPage() {
   // Reset captured image
   const handleRetake = useCallback(() => {
     setCapturedImage(null);
+    setCaption("");
+    setRating(null);
     setValidationState("idle");
     setValidationReason("");
   }, []);
@@ -184,6 +188,8 @@ export default function CameraPage() {
         imageBase64: base64,
         mimeType: "image/jpeg",
         voiceNote: voiceNote || undefined,
+        caption: caption || undefined,
+        rating: rating || undefined,
         latitude: latitude ?? undefined,
         longitude: longitude ?? undefined,
       });
@@ -210,7 +216,7 @@ export default function CameraPage() {
         toast.error("Không thể lưu food log");
       }
     }
-  }, [capturedImage, voiceNote, latitude, longitude, createFoodLog, navigate, validationState, utils]);
+  }, [capturedImage, voiceNote, caption, rating, latitude, longitude, createFoodLog, navigate, validationState]);
 
   if (authLoading) {
     return (
@@ -335,6 +341,7 @@ export default function CameraPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Voice note display */}
             {voiceNote && (
               <p className="text-white/70 text-sm text-center italic">"{voiceNote}"</p>
             )}
@@ -343,6 +350,41 @@ export default function CameraPage() {
                 <Loader2 className="w-3 h-3 animate-spin" /> Đang nhận diện giọng nói...
               </p>
             )}
+
+            {/* Caption input */}
+            <div className="space-y-1">
+              <label className="text-white/80 text-sm font-medium">Caption</label>
+              <textarea
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                placeholder="Nhập caption cho bức ảnh..."
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-terracotta/50 resize-none"
+                rows={2}
+              />
+            </div>
+
+            {/* Rating selector */}
+            <div className="space-y-1">
+              <label className="text-white/80 text-sm font-medium">Đánh giá</label>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setRating(star === rating ? null : star)}
+                    className="text-2xl transition-transform hover:scale-110"
+                  >
+                    {star <= (rating || 0) ? "⭐" : "☆"}
+                  </button>
+                ))}
+              </div>
+              {rating && (
+                <p className="text-white/50 text-xs text-center">
+                  {rating === 1 ? "Rất tệ" : rating === 2 ? "Tệ" : rating === 3 ? "Bình thường" : rating === 4 ? "Ngon" : "Rất ngon"}
+                </p>
+              )}
+            </div>
+
+            {/* Action buttons */}
             <div className="flex gap-3">
               <Button
                 variant="outline"

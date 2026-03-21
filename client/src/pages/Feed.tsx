@@ -54,6 +54,8 @@ interface FoodLog {
   calories: number | null;
   tags: string[] | null;
   voiceNote: string | null;
+  caption?: string | null;
+  rating?: number | null;
   createdAt: Date;
 }
 
@@ -70,7 +72,9 @@ const MOCK_LOGS: FoodLog[] = [
     locationName: "Tokyo, Japan",
     calories: 450,
     tags: ["spicy", "japanese", "rice"],
-    voiceNote: "Thơm ngon, cay vừa phải!",
+    voiceNote: null,
+    caption: "Thơm nức mũi, ngon tuyệt vời! 🍛",
+    rating: 4.5,
     createdAt: new Date(Date.now() - 1000 * 60 * 30),
   },
   {
@@ -85,6 +89,8 @@ const MOCK_LOGS: FoodLog[] = [
     calories: 380,
     tags: ["vietnamese", "noodles", "soup"],
     voiceNote: null,
+    caption: "Sáng nào cũng phải có tô phở mới tỉnh táo! 🍜",
+    rating: 5,
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
   },
   {
@@ -98,8 +104,42 @@ const MOCK_LOGS: FoodLog[] = [
     locationName: "Hồ Chí Minh, Việt Nam",
     calories: 620,
     tags: ["italian", "pizza", "cheese"],
-    voiceNote: "Pizza nóng hổi vừa thổi vừa ăn!",
+    voiceNote: null,
+    caption: "Pizza chiều nay quá đỉnh, phô mai kéo sợi tuyệt! 🍕",
+    rating: 4,
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+  },
+  {
+    id: 104,
+    userId: 204,
+    userName: "Tuấn Kiệt",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1553621042-f6e147245754?w=600&h=600&fit=crop",
+    dishName: "Sushi",
+    dishNameVi: "Sushi cá hồi",
+    locationName: "Đà Nẵng, Việt Nam",
+    calories: 320,
+    tags: ["japanese", "seafood", "raw"],
+    voiceNote: null,
+    caption: "Cá hồi tươi ngon, cơm sushi vừa tới! 🍣",
+    rating: 4.5,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8),
+  },
+  {
+    id: 105,
+    userId: 205,
+    userName: "Phương Thảo",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1562967914-608f82629710?w=600&h=600&fit=crop",
+    dishName: "Bún chả",
+    dishNameVi: "Bún chả Sinh Từ",
+    locationName: "Hà Nội, Việt Nam",
+    calories: 420,
+    tags: ["vietnamese", "grilled", "noodles"],
+    voiceNote: null,
+    caption: "Bún chả Sinh Từ chuẩn vị Hà Nội, nước chấm thần thánh! 🍖",
+    rating: 5,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
   },
 ];
 
@@ -296,18 +336,31 @@ export default function FeedPage() {
                 </div>
               </div>
 
-              {/* Food image */}
-              <div className="mt-1">
+              {/* Food image with rating badge */}
+              <div className="relative mt-1">
                 <img
                   src={log.imageUrl}
                   alt={log.dishName || "Food"}
                   className="w-full aspect-square object-cover"
                   loading="lazy"
                 />
+                {log.rating && (
+                  <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm px-2.5 py-1.5 rounded-full flex items-center gap-1">
+                    <span className="text-sm font-semibold text-white">{log.rating}</span>
+                    <span className="text-base">⭐</span>
+                  </div>
+                )}
               </div>
 
+              {/* Caption below image */}
+              {log.caption && (
+                <div className="px-4 pt-3 pb-2">
+                  <p className="text-sm text-gray-700 italic">{log.caption}</p>
+                </div>
+              )}
+
               {/* Action buttons row */}
-              <div className="flex items-center gap-2 px-4 pt-3 pb-2">
+              <div className="flex items-center gap-2 px-4 pt-2 pb-2">
                 {/* Reaction button */}
                 <Popover>
                   <PopoverTrigger asChild>
