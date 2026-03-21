@@ -142,28 +142,48 @@ const normalizeResponseFormat = ({
 
 /**
  * Priority:
- * 1. OPENAI_BASE_URL + OPENAI_API_KEY (proxy or direct OpenAI)
- * 2. OPENAI_API_KEY with default OpenAI URL
- * 3. Manus Forge API (fallback)
+ * 1. GEMINI_API_KEY → Google Gemini via OpenAI-compatible endpoint
+ * 2. OPENAI_API_KEY (real sk-* key) → OpenAI directly
+ * 3. OPENAI_API_KEY + OPENAI_BASE_URL → custom proxy
+ * 4. Manus Forge API (fallback for Manus platform)
+ *
+ * Gemini OpenAI-compatible endpoint:
+ *   base_url = https://generativelanguage.googleapis.com/v1beta/openai/
+ *   Supports: chat/completions, image_url (base64), response_format (json_schema)
  */
 function resolveApiConfig(): { url: string; apiKey: string; model: string } {
-  // 1. OpenAI API key available
+  // 1. Google Gemini (preferred - free tier, supports Vision)
+  if (ENV.geminiApiKey) {
+    const model = ENV.geminiModel || "gemini-2.5-flash";
+    const baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
+    const url = `${baseUrl}/chat/completions`;
+    console.log(`[LLM] Using Gemini API (OpenAI-compatible), model=${model}`);
+    return { url, apiKey: ENV.geminiApiKey, model };
+  }
+
+  // 2. OpenAI API key (real key starting with sk-)
+  if (ENV.openaiApiKey && ENV.openaiApiKey.startsWith("sk-")) {
+    const model = ENV.openaiModel || "gpt-4o-mini";
+    const url = "https://api.openai.com/v1/chat/completions";
+    console.log(`[LLM] Using OpenAI API directly, model=${model}`);
+    return { url, apiKey: ENV.openaiApiKey, model };
+  }
+
+  // 3. OpenAI API key with custom base URL (proxy)
   if (ENV.openaiApiKey) {
-    // Check for custom base URL (proxy like Manus LLM proxy)
+    const model = ENV.openaiModel || "gpt-4o-mini";
     const baseUrl = process.env.OPENAI_BASE_URL
       || process.env.OPENAI_API_BASE
       || "https://api.openai.com/v1";
     const url = baseUrl.replace(/\/+$/, "") + "/chat/completions";
-    return {
-      url,
-      apiKey: ENV.openaiApiKey,
-      model: ENV.openaiModel || "gpt-4.1-mini",
-    };
+    console.log(`[LLM] Using OpenAI proxy at ${baseUrl}, model=${model}`);
+    return { url, apiKey: ENV.openaiApiKey, model };
   }
 
-  // 2. Manus Forge API (fallback for Manus platform)
+  // 4. Manus Forge API (fallback for Manus platform)
   if (ENV.forgeApiKey) {
     const baseUrl = ENV.forgeApiUrl || "https://forge.manus.im";
+    console.log(`[LLM] Using Manus Forge API`);
     return {
       url: `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`,
       apiKey: ENV.forgeApiKey,
@@ -171,7 +191,7 @@ function resolveApiConfig(): { url: string; apiKey: string; model: string } {
     };
   }
 
-  throw new Error("No LLM API key configured. Set OPENAI_API_KEY or BUILT_IN_FORGE_API_KEY.");
+  throw new Error("No LLM API key configured. Set GEMINI_API_KEY, OPENAI_API_KEY, or BUILT_IN_FORGE_API_KEY.");
 }
 
 function hasImageContent(messages: Message[]): boolean {

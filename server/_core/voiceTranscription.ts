@@ -1,5 +1,9 @@
 /**
  * Voice transcription: OpenAI Whisper direct → Manus Forge fallback
+ * Note: Gemini does not have a Whisper-compatible endpoint,
+ *       so voice transcription always uses OpenAI or Forge.
+ *       If neither is available, we use Gemini LLM as a fallback
+ *       by converting audio to text via the chat endpoint.
  */
 import { ENV } from "./env";
 
@@ -55,6 +59,80 @@ function getLanguageName(langCode: string): string {
   return langMap[langCode] || langCode;
 }
 
+/**
+ * Fallback: Use Gemini LLM to transcribe audio via the chat endpoint.
+ * Gemini supports audio input via file_url in OpenAI-compatible mode.
+ */
+async function transcribeViaGemini(
+  audioBuffer: Buffer,
+  mimeType: string,
+  language?: string
+): Promise<TranscriptionResponse | TranscriptionError> {
+  try {
+    const audioBase64 = audioBuffer.toString("base64");
+    const model = ENV.geminiModel || "gemini-2.5-flash";
+    const url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+    const langHint = language ? ` The audio is in ${getLanguageName(language)}.` : "";
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${ENV.geminiApiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: `You are a speech-to-text transcription engine. Transcribe the audio accurately. Return ONLY the transcribed text, nothing else.${langHint}`,
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_audio",
+                input_audio: {
+                  data: audioBase64,
+                  format: mimeType.includes("wav") ? "wav" : "mp3",
+                },
+              },
+              { type: "text", text: "Transcribe this audio to text." },
+            ],
+          },
+        ],
+        max_tokens: 2048,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error("[Whisper/Gemini] Gemini transcription failed:", response.status, errorText);
+      return { error: "Gemini transcription failed", code: "TRANSCRIPTION_FAILED", details: `${response.status} ${errorText}` };
+    }
+
+    const result = await response.json();
+    const text = result.choices?.[0]?.message?.content || "";
+    
+    if (!text) {
+      return { error: "Empty transcription", code: "SERVICE_ERROR" };
+    }
+
+    // Return in WhisperResponse format for compatibility
+    return {
+      task: "transcribe",
+      language: language || "vi",
+      duration: 0,
+      text: text.trim(),
+      segments: [],
+    };
+  } catch (error) {
+    console.error("[Whisper/Gemini] Fallback failed:", error);
+    return { error: "Gemini transcription failed", code: "SERVICE_ERROR", details: String(error) };
+  }
+}
+
 export async function transcribeAudio(
   options: TranscribeOptions
 ): Promise<TranscriptionResponse | TranscriptionError> {
@@ -76,7 +154,7 @@ export async function transcribeAudio(
       return { error: "Failed to fetch audio", code: "SERVICE_ERROR", details: String(error) };
     }
 
-    // Build form data
+    // Build form data for Whisper API
     const filename = `audio.${getFileExtension(mimeType)}`;
     const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
     const formData = new FormData();
@@ -91,12 +169,16 @@ export async function transcribeAudio(
     );
     formData.append("prompt", prompt);
 
-    // Determine API endpoint
-    let apiUrl: string;
-    let apiKey: string;
+    // Determine API endpoint - Whisper only available via OpenAI or Forge
+    let apiUrl: string | null = null;
+    let apiKey: string | null = null;
 
-    if (ENV.openaiApiKey) {
-      // OpenAI (direct or via proxy)
+    if (ENV.openaiApiKey && ENV.openaiApiKey.startsWith("sk-")) {
+      // Real OpenAI key → call api.openai.com directly
+      apiUrl = "https://api.openai.com/v1/audio/transcriptions";
+      apiKey = ENV.openaiApiKey;
+    } else if (ENV.openaiApiKey) {
+      // Non-standard key → check for custom base URL (proxy)
       const baseUrl = process.env.OPENAI_BASE_URL
         || process.env.OPENAI_API_BASE
         || "https://api.openai.com/v1";
@@ -107,27 +189,35 @@ export async function transcribeAudio(
       const baseUrl = ENV.forgeApiUrl.endsWith("/") ? ENV.forgeApiUrl : `${ENV.forgeApiUrl}/`;
       apiUrl = new URL("v1/audio/transcriptions", baseUrl).toString();
       apiKey = ENV.forgeApiKey;
-    } else {
-      return { error: "No transcription API configured", code: "SERVICE_ERROR" };
     }
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "Accept-Encoding": "identity" },
-      body: formData,
-    });
+    // Try Whisper API first
+    if (apiUrl && apiKey) {
+      console.log(`[Whisper] Calling ${apiUrl}`);
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { authorization: `Bearer ${apiKey}`, "Accept-Encoding": "identity" },
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      return { error: "Transcription failed", code: "TRANSCRIPTION_FAILED", details: `${response.status} ${errorText}` };
+      if (response.ok) {
+        const result = (await response.json()) as WhisperResponse;
+        if (result.text && typeof result.text === "string") {
+          return result;
+        }
+      } else {
+        const errorText = await response.text().catch(() => "");
+        console.warn(`[Whisper] OpenAI Whisper failed (${response.status}), trying Gemini fallback...`, errorText);
+      }
     }
 
-    const result = (await response.json()) as WhisperResponse;
-    if (!result.text || typeof result.text !== "string") {
-      return { error: "Invalid transcription response", code: "SERVICE_ERROR" };
+    // Fallback: Use Gemini for transcription if available
+    if (ENV.geminiApiKey) {
+      console.log("[Whisper] Falling back to Gemini for transcription");
+      return await transcribeViaGemini(audioBuffer, mimeType, options.language);
     }
 
-    return result;
+    return { error: "No transcription API configured", code: "SERVICE_ERROR" };
   } catch (error) {
     return { error: "Voice transcription failed", code: "SERVICE_ERROR", details: String(error) };
   }
