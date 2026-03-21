@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -22,13 +21,26 @@ import {
 import { trpc } from "@/lib/trpc";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Flame, MapPin, MessageCircle, SmilePlus, Trash2, MoreHorizontal } from "lucide-react";
-import { useState, useCallback } from "react";
+import { Flame, MapPin, MessageCircle, SmilePlus, Trash2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
 import UserProfileSheet from "@/components/UserProfileSheet";
 import ChatSheet from "@/components/ChatSheet";
 import { toast } from "sonner";
 
-const EMOJI_LIST = ["😋", "🤤", "😍", "🔥", "👍", "❤️", "😮", "🥰"];
+// 3 reactions: ngon, binh thuong, do
+const EMOJI_LIST = [
+  { emoji: "😋", label: "Ngon" },
+  { emoji: "😐", label: "Bình thường" },
+  { emoji: "🤢", label: "Dở" }
+];
+
+interface Reaction {
+  id: number;
+  userId: number;
+  emoji: string;
+  userName: string | null;
+  userAvatar: string | null;
+}
 
 export default function FeedPage() {
   const { user } = useAuth();
@@ -49,11 +61,32 @@ export default function FeedPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Reactions state: track reactions per post
-  const [postReactions, setPostReactions] = useState<Record<number, { emoji: string; userName: string | null }[]>>({});
+  const [postReactions, setPostReactions] = useState<Record<number, Reaction[]>>({});
+
+  const utils = trpc.useUtils();
 
   const addReaction = trpc.reaction.add.useMutation({
-    onSuccess: () => {
-      toast.success("Đã thả reaction!");
+    onSuccess: (_, variables) => {
+      // Optimistic update: add reaction to local state immediately
+      setPostReactions((prev) => {
+        const currentReactions = prev[variables.foodLogId] || [];
+        // Remove existing reaction from this user if any
+        const filteredReactions = currentReactions.filter((r) => r.userId !== user?.id);
+        // Add new reaction
+        const newReaction: Reaction = {
+          id: Date.now(), // temporary id
+          userId: user!.id,
+          emoji: variables.emoji,
+          userName: user?.name || null,
+          userAvatar: user?.avatar || null,
+        };
+        return {
+          ...prev,
+          [variables.foodLogId]: [...filteredReactions, newReaction],
+        };
+      });
+      // Invalidate to refetch from server in background
+      utils.reaction.getForPost.invalidate({ foodLogId: variables.foodLogId });
     },
   });
 
@@ -67,6 +100,27 @@ export default function FeedPage() {
       toast.error("Không thể xóa bài đăng");
     },
   });
+
+  // Load reactions for each post when logs change
+  useEffect(() => {
+    if (!logs?.length) return;
+    
+    const loadReactions = async () => {
+      const reactionsMap: Record<number, Reaction[]> = {};
+      for (const log of logs) {
+        try {
+          const reactions = await utils.reaction.getForPost.fetch({ foodLogId: log.id });
+          reactionsMap[log.id] = reactions;
+        } catch (error) {
+          console.error(`Failed to load reactions for post ${log.id}:`, error);
+          reactionsMap[log.id] = [];
+        }
+      }
+      setPostReactions(reactionsMap);
+    };
+    
+    loadReactions();
+  }, [logs, utils]);
 
   const handleOpenProfile = (userId: number) => {
     if (user && userId === user.id) return;
@@ -84,14 +138,7 @@ export default function FeedPage() {
 
   const handleReaction = useCallback((logId: number, emoji: string) => {
     addReaction.mutate({ foodLogId: logId, emoji });
-    // Optimistic update
-    setPostReactions((prev) => {
-      const existing = prev[logId] || [];
-      // Remove existing reaction from same user, add new
-      const filtered = existing.filter((r) => r.userName !== (user?.name || null));
-      return { ...prev, [logId]: [...filtered, { emoji, userName: user?.name || null }] };
-    });
-  }, [addReaction, user]);
+  }, [addReaction]);
 
   const handleDeletePost = (logId: number) => {
     setDeleteLogId(logId);
@@ -138,6 +185,13 @@ export default function FeedPage() {
         {logs?.map((log) => {
           const isOwner = user && log.userId === user.id;
           const reactions = postReactions[log.id] || [];
+
+          // Group reactions by emoji and count
+          const reactionCounts: Record<string, number> = {};
+          reactions.forEach((r) => {
+            reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+          });
+          const groupedReactions = Object.entries(reactionCounts);
 
           return (
             <Card key={log.id} className="overflow-hidden bg-card border-border/50 shadow-sm">
@@ -206,13 +260,14 @@ export default function FeedPage() {
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-2" side="top" align="start">
                     <div className="flex gap-1">
-                      {EMOJI_LIST.map((emoji) => (
+                      {EMOJI_LIST.map((item) => (
                         <button
-                          key={emoji}
-                          onClick={() => handleReaction(log.id, emoji)}
-                          className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-lg transition-transform hover:scale-125"
+                          key={item.emoji}
+                          onClick={() => handleReaction(log.id, item.emoji)}
+                          className="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-2xl transition-transform hover:scale-125"
+                          title={item.label}
                         >
-                          {emoji}
+                          {item.emoji}
                         </button>
                       ))}
                     </div>
@@ -232,13 +287,14 @@ export default function FeedPage() {
               </div>
 
               {/* Reactions display */}
-              {reactions.length > 0 && (
+              {groupedReactions.length > 0 && (
                 <div className="px-3 pb-1">
                   <div className="flex items-center gap-1 flex-wrap">
-                    {reactions.map((r, i) => (
-                      <span key={i} className="text-sm" title={r.userName || undefined}>
-                        {r.emoji}
-                      </span>
+                    {groupedReactions.map(([emoji, count]) => (
+                      <div key={emoji} className="flex items-center gap-0.5">
+                        <span className="text-sm">{emoji}</span>
+                        {count > 1 && <span className="text-xs text-muted-foreground">{count}</span>}
+                      </div>
                     ))}
                     <span className="text-xs text-muted-foreground ml-1">
                       {reactions.length} reaction{reactions.length > 1 ? "s" : ""}

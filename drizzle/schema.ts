@@ -111,7 +111,7 @@ export const postReactions = mysqlTable("post_reactions", {
   id: int("id").autoincrement().primaryKey(),
   foodLogId: int("foodLogId").notNull(),
   userId: int("userId").notNull(),
-  emoji: varchar("emoji", { length: 32 }).notNull(),
+  emoji: varchar("emoji", { length: 16 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
