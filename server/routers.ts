@@ -244,6 +244,67 @@ export const appRouter = router({
 
   // ─── Food Logs ───────────────────────────────────────────────────
   foodLog: router({
+    // Validate image before upload - check if it's food/drink
+    validateImage: protectedProcedure
+      .input(z.object({
+        imageBase64: z.string(),
+        mimeType: z.string().default("image/jpeg"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a food/drink image classifier. Analyze the image and determine if it contains food or drinks.
+Return JSON with:
+- isFood: boolean (true if the image contains food, drinks, beverages, or anything edible/drinkable)
+- confidence: number between 0 and 1
+- reason: brief explanation in Vietnamese
+Be lenient - if there's any food or drink visible in the image, even partially, return isFood: true.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+                  { type: "text", text: "Is this image of food or drinks?" },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "food_validation",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    isFood: { type: "boolean" },
+                    confidence: { type: "number" },
+                    reason: { type: "string" },
+                  },
+                  required: ["isFood", "confidence", "reason"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = response.choices[0]?.message?.content;
+          if (typeof content === "string") {
+            const result = JSON.parse(content);
+            return { isFood: result.isFood, confidence: result.confidence, reason: result.reason };
+          }
+          // If parsing fails, allow upload (fail-open)
+          return { isFood: true, confidence: 0.5, reason: "Không thể xác định" };
+        } catch (err) {
+          console.error("[AI] Food validation failed:", err);
+          // Fail-open: allow upload if validation fails
+          return { isFood: true, confidence: 0, reason: "Lỗi hệ thống, cho phép upload" };
+        }
+      }),
+
     create: protectedProcedure
       .input(z.object({
         imageBase64: z.string(),
@@ -254,6 +315,54 @@ export const appRouter = router({
         locationName: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // 0. AI Vision Validation - Check if image is food/drink
+        try {
+          const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
+          const validationResponse = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a food/drink image classifier. Return JSON: { "isFood": boolean }. Return true if the image contains any food, drinks, beverages, or edible items. Be lenient.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+                  { type: "text", text: "Is this food or drink?" },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "food_check",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: { isFood: { type: "boolean" } },
+                  required: ["isFood"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const checkContent = validationResponse.choices[0]?.message?.content;
+          if (typeof checkContent === "string") {
+            const checkResult = JSON.parse(checkContent);
+            if (!checkResult.isFood) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Ch\u1EC9 \u0111\u01B0\u1EE3c ph\u00E9p \u0111\u0103ng \u1EA3nh \u0111\u1ED3 \u0103n/n\u01B0\u1EDBc u\u1ED1ng!",
+              });
+            }
+          }
+        } catch (err) {
+          // Re-throw TRPCError (our validation error)
+          if (err instanceof TRPCError) throw err;
+          // Otherwise fail-open: allow upload if AI validation itself fails
+          console.error("[AI] Food validation in create failed:", err);
+        }
+
         // 1. Upload image to S3
         const buffer = Buffer.from(input.imageBase64, "base64");
         const ext = input.mimeType.split("/")[1] || "jpg";

@@ -2,10 +2,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { trpc } from "@/lib/trpc";
-import { Camera as CameraIcon, Mic, MicOff, RotateCcw, Check, Loader2, X, Sparkles } from "lucide-react";
+import { Camera as CameraIcon, Mic, MicOff, RotateCcw, Check, Loader2, X, Sparkles, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
+
+type ValidationState = "idle" | "validating" | "valid" | "invalid";
 
 export default function CameraPage() {
   const { user, loading: authLoading } = useAuth({
@@ -20,12 +22,14 @@ export default function CameraPage() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [voiceNote, setVoiceNote] = useState<string>("");
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [validationState, setValidationState] = useState<ValidationState>("idle");
+  const [validationReason, setValidationReason] = useState<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   const { latitude, longitude, requestLocation } = useGeolocation();
   const createFoodLog = trpc.foodLog.create.useMutation();
+  const validateImage = trpc.foodLog.validateImage.useMutation();
   const transcribeMutation = trpc.voice.transcribe.useMutation();
 
   // Start camera
@@ -55,8 +59,8 @@ export default function CameraPage() {
     };
   }, [startCamera, capturedImage, requestLocation]);
 
-  // Capture photo
-  const capturePhoto = useCallback(() => {
+  // Capture photo and immediately validate with AI Vision
+  const capturePhoto = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -69,14 +73,35 @@ export default function CameraPage() {
     ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     setCapturedImage(dataUrl);
-    setIsAnalyzing(true);
     if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-    
-    // Stop analyzing after 2 seconds (simulated)
-    setTimeout(() => {
-      setIsAnalyzing(false);
-    }, 2000);
-  }, []);
+
+    // AI Vision Validation - check if it's food/drink
+    setValidationState("validating");
+    setValidationReason("");
+    try {
+      const base64 = dataUrl.split(",")[1];
+      const result = await validateImage.mutateAsync({
+        imageBase64: base64,
+        mimeType: "image/jpeg",
+      });
+
+      if (result.isFood) {
+        setValidationState("valid");
+        setValidationReason(result.reason);
+      } else {
+        setValidationState("invalid");
+        setValidationReason(result.reason || "Ảnh không chứa đồ ăn hoặc nước uống");
+        toast.error("Chỉ được phép đăng ảnh đồ ăn/nước uống!", {
+          description: result.reason,
+          duration: 5000,
+        });
+      }
+    } catch (err) {
+      // If validation API fails, allow upload (fail-open)
+      setValidationState("valid");
+      setValidationReason("Không thể xác minh, cho phép đăng");
+    }
+  }, [validateImage]);
 
   // Toggle camera
   const toggleCamera = useCallback(() => {
@@ -128,9 +153,23 @@ export default function CameraPage() {
     }
   }, [isRecording, transcribeMutation]);
 
-  // Submit food log
+  // Reset captured image
+  const handleRetake = useCallback(() => {
+    setCapturedImage(null);
+    setValidationState("idle");
+    setValidationReason("");
+  }, []);
+
+  // Submit food log - only if validated as food
   const handleSubmit = useCallback(async () => {
     if (!capturedImage) return;
+
+    // Double-check: block if validation says it's not food
+    if (validationState === "invalid") {
+      toast.error("Chỉ được phép đăng ảnh đồ ăn/nước uống!");
+      return;
+    }
+
     const base64 = capturedImage.split(",")[1];
     try {
       const result = await createFoodLog.mutateAsync({
@@ -142,10 +181,17 @@ export default function CameraPage() {
       });
       toast.success(result.analysis?.dishNameVi ? `Đã lưu: ${result.analysis.dishNameVi}` : "Đã lưu food log!");
       navigate("/feed");
-    } catch {
-      toast.error("Không thể lưu food log");
+    } catch (err: any) {
+      // Handle server-side validation error
+      const message = err?.message || "";
+      if (message.includes("đồ ăn") || message.includes("nước uống")) {
+        toast.error("Chỉ được phép đăng ảnh đồ ăn/nước uống!");
+        setValidationState("invalid");
+      } else {
+        toast.error("Không thể lưu food log");
+      }
     }
-  }, [capturedImage, voiceNote, latitude, longitude, createFoodLog, navigate]);
+  }, [capturedImage, voiceNote, latitude, longitude, createFoodLog, navigate, validationState]);
 
   if (authLoading) {
     return (
@@ -188,8 +234,8 @@ export default function CameraPage() {
           <>
             <img src={capturedImage} alt="Captured" className="w-full h-full object-cover" />
             
-            {/* Analyzing overlay */}
-            {isAnalyzing && (
+            {/* Validation overlay */}
+            {validationState === "validating" && (
               <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
                 {/* Scanner animation */}
                 <div className="absolute inset-0 overflow-hidden">
@@ -201,8 +247,41 @@ export default function CameraPage() {
                   <div className="w-16 h-16 rounded-full bg-terracotta/20 flex items-center justify-center mx-auto mb-4">
                     <Sparkles className="w-8 h-8 text-white animate-pulse" />
                   </div>
-                  <p className="text-white text-lg font-medium">AI đang phân tích...</p>
-                  <p className="text-white/60 text-sm mt-1">Nhận diện món ăn từ hình ảnh</p>
+                  <p className="text-white text-lg font-medium">AI đang kiểm tra...</p>
+                  <p className="text-white/60 text-sm mt-1">Xác nhận đây là ảnh đồ ăn/nước uống</p>
+                </div>
+              </div>
+            )}
+
+            {/* Validation result badge */}
+            {validationState === "valid" && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+                <div className="bg-green-500/90 backdrop-blur-sm text-white px-4 py-2 rounded-full flex items-center gap-2 shadow-lg">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="text-sm font-medium">Đồ ăn/Nước uống</span>
+                </div>
+              </div>
+            )}
+
+            {validationState === "invalid" && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
+                <div className="text-center px-6">
+                  <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+                    <ShieldAlert className="w-10 h-10 text-destructive" />
+                  </div>
+                  <p className="text-white text-xl font-bold mb-2">Không phải đồ ăn!</p>
+                  <p className="text-white/70 text-sm mb-1">
+                    Chỉ được phép đăng ảnh đồ ăn/nước uống!
+                  </p>
+                  {validationReason && (
+                    <p className="text-white/50 text-xs">{validationReason}</p>
+                  )}
+                  <Button
+                    className="mt-6 bg-white text-black hover:bg-white/90"
+                    onClick={handleRetake}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" /> Chụp lại
+                  </Button>
                 </div>
               </div>
             )}
@@ -249,21 +328,33 @@ export default function CameraPage() {
               <Button
                 variant="outline"
                 className="flex-1 border-white/30 text-white bg-transparent hover:bg-white/10"
-                onClick={() => setCapturedImage(null)}
+                onClick={handleRetake}
               >
                 <RotateCcw className="w-4 h-4 mr-2" /> Chụp lại
               </Button>
               <Button
                 className="flex-1 bg-terracotta hover:bg-terracotta-dark text-white"
                 onClick={handleSubmit}
-                disabled={createFoodLog.isPending}
+                disabled={
+                  createFoodLog.isPending ||
+                  validationState === "validating" ||
+                  validationState === "invalid"
+                }
               >
                 {createFoodLog.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : validationState === "validating" ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}
-                {createFoodLog.isPending ? "Đang phân tích..." : "Lưu"}
+                {createFoodLog.isPending
+                  ? "Đang phân tích..."
+                  : validationState === "validating"
+                  ? "Đang kiểm tra..."
+                  : validationState === "invalid"
+                  ? "Không hợp lệ"
+                  : "Lưu"}
               </Button>
             </div>
           </div>
