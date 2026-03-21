@@ -1,0 +1,23 @@
+# Weat - Project TODO
+
+- [x] Database schema: food_logs, check_ins, friendships, match_invites tables + users extensions
+- [x] DB helpers: CRUD for food_logs, check_ins, friendships, match_invites, user profile
+- [x] tRPC routers: foodLog, radar, match, profile, venue procedures
+- [x] AI food analysis via OpenAI Vision API (dishName, category, ingredients, calories, tags)
+- [x] Food DNA computation (auto-update after every 3 food logs)
+- [x] WebSocket server for real-time match invites and notifications
+- [x] Voice transcription integration for food description
+- [x] Earth-tone design system (terracotta, ochre, sage, cream)
+- [x] Camera full-screen UI with viewfinder frame and capture button
+- [x] Feed page: food logs list with images, dish name, user info, time, tags
+- [x] Radar map: nearby users within 200m with distance and Food DNA compatibility
+- [x] Match system UI: send invite, accept/decline, notifications
+- [x] Venue suggestions using Google Maps API
+- [x] Profile page: avatar, bio, food log count, friend count, Food DNA display
+- [x] Voice input component for describing food
+- [x] App routing and navigation
+- [x] Vitest tests for key server procedures (15 tests passing)
+- [x] Bug fix: Home.tsx navigate() called during render phase causing setState-in-render error
+- [x] Bug fix: Vite WebSocket HMR connection failing (dev-only proxy issue, no code fix needed)
+- [x] Bug fix: Giao diện tối sau khi đăng nhập - force light mode for dark OS users
+- [ ] Bug fix: Landing page hoàn toàn đen trên thiết bị dark mode - CSS fix chưa đủ mạnh

@@ -1,40 +1,38 @@
 # Weat
 
-Weat is a mobile-first PWA for instant food-based matching.
+**Discover food together.** Chụp ảnh món ăn, tìm bạn ăn cùng trong bán kính 200m.
 
-## Project Structure
+## Features
 
-- `docs/`: product and technical documents
-- `frontend/`: Next.js PWA app
-- `backend/`: Node.js API, realtime, jobs
-- `scripts/`: utility scripts for local/devops workflows
+- Camera full-screen UI để chụp ảnh món ăn
+- AI phân tích món ăn qua OpenAI Vision API (Food DNA extraction)
+- Feed hiển thị danh sách bài post món ăn
+- Radar map hiển thị người dùng gần bạn (200m)
+- Hệ thống match real-time qua WebSocket
+- Gợi ý quán ăn phù hợp dựa trên Food DNA và vị trí
+- Profile người dùng với lịch sử món ăn
+- PWA - cài đặt app như native
+- Voice input - mô tả món ăn bằng giọng nói
 
-## Quick Start (Planned)
+## Tech Stack
 
-## 1. Backend
-- Create `.env` from `.env.example` (to be added)
-- Install dependencies
-- Run database migrations
-- Start API server
+- **Frontend**: React 19, TypeScript, TailwindCSS v4, Radix UI, Framer Motion
+- **Backend**: Express, tRPC, Drizzle ORM, MySQL
+- **Real-time**: WebSocket
+- **AI**: OpenAI Vision API
+- **Storage**: AWS S3
+- **Maps**: Google Maps API
 
-## 2. Frontend
-- Create `.env.local` from `.env.local.example` (to be added)
-- Install dependencies
-- Start dev server
+## Development
 
-## Core Docs
-- Plan: `docs/plan.md`
-- API contract: `docs/endpoints.md`
-- Frontend standards: `docs/frontend-standards.md`
-- Delivery checklist: `docs/checklist-zero-to-done.md`
+```bash
+pnpm install
+pnpm dev
+```
 
-## Branching Suggestion
-- `main`: stable demo branch
-- `dev`: integration branch
-- feature branches: `feature/<scope>`
+## Build
 
-## Definition of Ready for First Commit
-- Base folder structure created
-- Core docs prepared
-- `.gitignore` configured
-- README added
+```bash
+pnpm build
+pnpm start
+```
