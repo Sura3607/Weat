@@ -39,6 +39,7 @@ export type InvokeParams = {
   tools?: Tool[];
   toolChoice?: ToolChoice;
   tool_choice?: ToolChoice;
+  model?: string;
   maxTokens?: number;
   max_tokens?: number;
   outputSchema?: OutputSchema;
@@ -173,34 +174,45 @@ function resolveApiConfig(): { url: string; apiKey: string; model: string } {
   throw new Error("No LLM API key configured. Set OPENAI_API_KEY or BUILT_IN_FORGE_API_KEY.");
 }
 
-// ─── Main invoke ──────────────────────────────────────────────────
+function hasImageContent(messages: Message[]): boolean {
+  return messages.some((message) => {
+    const parts = Array.isArray(message.content) ? message.content : [message.content];
+    return parts.some((part) => typeof part !== "string" && part.type === "image_url");
+  });
+}
 
-export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  const config = resolveApiConfig();
+function shouldRetryWithoutResponseFormat(errorText: string): boolean {
+  const lowered = errorText.toLowerCase();
+  return (
+    lowered.includes("response_format")
+    || lowered.includes("json_schema")
+    || lowered.includes("unsupported")
+    || lowered.includes("invalid parameter")
+  );
+}
 
-  const { messages, tools, toolChoice, tool_choice, outputSchema, output_schema, responseFormat, response_format } = params;
+function shouldRetryWithVisionModel(errorText: string): boolean {
+  const lowered = errorText.toLowerCase();
+  return (
+    lowered.includes("image")
+    || lowered.includes("vision")
+    || lowered.includes("content type")
+    || lowered.includes("unsupported")
+    || lowered.includes("invalid image_url")
+    || lowered.includes("does not support")
+  );
+}
 
-  const payload: Record<string, unknown> = {
-    model: config.model,
-    messages: messages.map(normalizeMessage),
-    max_tokens: params.maxTokens || params.max_tokens || 4096,
-  };
-
-  if (tools && tools.length > 0) payload.tools = tools;
-
-  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
-  if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
-
-  const normalizedResponseFormat = normalizeResponseFormat({ responseFormat, response_format, outputSchema, output_schema });
-  if (normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
-
-  console.log(`[LLM] Calling ${config.url} with model ${config.model}`);
-
-  const response = await fetch(config.url, {
+async function callCompletionsApi(
+  url: string,
+  apiKey: string,
+  payload: Record<string, unknown>
+): Promise<InvokeResult> {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${config.apiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -211,4 +223,68 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
 
   return (await response.json()) as InvokeResult;
+}
+
+// ─── Main invoke ──────────────────────────────────────────────────
+
+export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  const config = resolveApiConfig();
+
+  const { messages, tools, toolChoice, tool_choice, outputSchema, output_schema, responseFormat, response_format } = params;
+
+  const normalizedMessages = messages.map(normalizeMessage);
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+  const normalizedResponseFormat = normalizeResponseFormat({ responseFormat, response_format, outputSchema, output_schema });
+
+  const createPayload = (
+    model: string,
+    includeResponseFormat: boolean
+  ): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      model,
+      messages: normalizedMessages,
+      max_tokens: params.maxTokens || params.max_tokens || 4096,
+    };
+
+    if (tools && tools.length > 0) payload.tools = tools;
+    if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
+    if (includeResponseFormat && normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
+
+    return payload;
+  };
+
+  const primaryModel = params.model || config.model;
+  const visionMode = hasImageContent(messages);
+  const modelCandidates = visionMode
+    ? Array.from(new Set([primaryModel, process.env.OPENAI_VISION_MODEL || "gpt-4.1-mini", "gpt-4o"]))
+    : [primaryModel];
+
+  let lastError: unknown;
+
+  for (const model of modelCandidates) {
+    try {
+      console.log(`[LLM] Calling ${config.url} with model ${model}`);
+      return await callCompletionsApi(config.url, config.apiKey, createPayload(model, true));
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (normalizedResponseFormat && shouldRetryWithoutResponseFormat(message)) {
+        try {
+          console.warn(`[LLM] response_format rejected, retrying without response_format (model=${model})`);
+          return await callCompletionsApi(config.url, config.apiKey, createPayload(model, false));
+        } catch (retryError) {
+          lastError = retryError;
+        }
+      }
+
+      if (!visionMode || !shouldRetryWithVisionModel(message)) {
+        break;
+      }
+
+      console.warn(`[LLM] Vision request failed on model ${model}, trying next candidate...`);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
