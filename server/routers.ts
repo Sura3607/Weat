@@ -461,7 +461,7 @@ Return ONLY valid JSON, no markdown.`;
             throw new Error("AI response is not valid JSON");
           }
         } catch (err) {
-          console.error("[AI] Food analysis failed (strict schema):", err);
+          console.error("[AI] Food analysis failed (strict schema):", String(err).slice(0, 300));
 
           // Retry with a more permissive response format for models/proxies
           try {
@@ -484,7 +484,7 @@ Return ONLY valid JSON, no markdown.`;
               aiResult = retryParsed;
             }
           } catch (retryErr) {
-            console.error("[AI] Food analysis fallback failed:", retryErr);
+            console.error("[AI] Food analysis fallback failed:", String(retryErr).slice(0, 300));
           }
         }
 
