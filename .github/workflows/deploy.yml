@@ -1,0 +1,42 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "server/**"
+      - "shared/**"
+      - "Dockerfile"
+      - "docker-compose.prod.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "patches/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/Weat
+            # Kéo code mới nhất từ GitHub về máy chủ
+            git pull origin main 
+            
+            # (Tùy chọn) Chạy cập nhật database nếu có bảng mới
+            sudo docker run --rm --env-file .env -v $(pwd):/app -w /app node:22-alpine sh -c "corepack enable && pnpm install && pnpm run db:push"
+            
+            # Build và chạy lại ứng dụng (không làm sập app đang chạy cho đến khi build xong)
+            sudo docker compose -f docker-compose.prod.yml up -d --build
+            
+            # Xóa các file build cũ để giải phóng ổ cứng EC2
+            sudo docker image prune -f

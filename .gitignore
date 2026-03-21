@@ -111,4 +111,5 @@ temp/
 
 # Manus (local dev environment)
 .manus/
+.manus-logs/
 client/public/__manus__/version.json
