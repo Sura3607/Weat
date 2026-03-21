@@ -28,6 +28,7 @@ export default function CameraPage() {
   const chunksRef = useRef<Blob[]>([]);
 
   const { latitude, longitude, requestLocation } = useGeolocation();
+  const utils = trpc.useUtils();
   const createFoodLog = trpc.foodLog.create.useMutation();
   const validateImage = trpc.foodLog.validateImage.useMutation();
   const transcribeMutation = trpc.voice.transcribe.useMutation();
@@ -180,6 +181,10 @@ export default function CameraPage() {
         longitude: longitude ?? undefined,
       });
       toast.success(result.analysis?.dishNameVi ? `Đã lưu: ${result.analysis.dishNameVi}` : "Đã lưu food log!");
+      // Invalidate feed & profile so they show the new food log immediately
+      utils.foodLog.feed.invalidate();
+      utils.foodLog.myLogs.invalidate();
+      utils.profile.get.invalidate();
       navigate("/feed");
     } catch (err: any) {
       // Handle server-side validation error
