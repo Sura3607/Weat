@@ -20,8 +20,17 @@ export default function AuthPage({ onComplete }: AuthPageProps) {
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async () => {
       await refetch();
-      onComplete();
-      navigate("/feed");
+      // Check if user has completed onboarding before
+      const onboardingComplete = localStorage.getItem("onboardingComplete") === "true";
+      if (!onboardingComplete) {
+        // New user - set first time flag and go to onboarding
+        localStorage.setItem("weat-first-time", "true");
+        navigate("/onboarding");
+      } else {
+        // Existing user - go directly to feed
+        onComplete();
+        navigate("/feed");
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Đăng nhập thất bại");

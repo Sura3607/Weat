@@ -14,8 +14,8 @@ export default function BottomNav() {
   const [location, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  // Hide on camera page and home page (before login)
-  if (location === "/camera" || location === "/") return null;
+  // Hide on camera page, home page, and onboarding page
+  if (location === "/camera" || location === "/" || location === "/onboarding") return null;
 
   const handleNavClick = (path: string) => {
     // If already on this page, trigger a data refresh
@@ -39,8 +39,8 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card/95 backdrop-blur-md border-t border-border bottom-nav z-50">
-      <div className="flex items-center justify-around px-2 py-1">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] bottom-nav z-50">
+      <div className="flex items-center justify-around px-2 py-2">
         {navItems.map((item) => {
           const isActive = location === item.path;
           const Icon = item.icon;
@@ -48,11 +48,11 @@ export default function BottomNav() {
           if (item.isCenter) {
             return (
               <Link key={item.path} href={item.path} onClick={() => handleNavClick(item.path)}>
-                <div className="flex flex-col items-center -mt-5">
-                  <div className="w-14 h-14 rounded-full bg-terracotta shadow-lg flex items-center justify-center">
+                <div className="flex flex-col items-center -mt-6">
+                  <div className="w-14 h-14 rounded-full bg-terracotta shadow-lg shadow-terracotta/30 flex items-center justify-center ring-4 ring-white">
                     <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-[10px] mt-0.5 text-muted-foreground">{item.label}</span>
+                  <span className={`text-[10px] mt-1 ${isActive ? "text-terracotta font-semibold" : "text-gray-500"}`}>{item.label}</span>
                 </div>
               </Link>
             );
@@ -62,13 +62,13 @@ export default function BottomNav() {
             <Link key={item.path} href={item.path} onClick={() => handleNavClick(item.path)}>
               <div className="flex flex-col items-center py-2 px-3">
                 <Icon
-                  className={`w-5 h-5 transition-colors ${
-                    isActive ? "text-terracotta" : "text-muted-foreground"
+                  className={`w-6 h-6 transition-colors ${
+                    isActive ? "text-terracotta" : "text-gray-400"
                   }`}
                 />
                 <span
-                  className={`text-[10px] mt-0.5 transition-colors ${
-                    isActive ? "text-terracotta font-medium" : "text-muted-foreground"
+                  className={`text-[11px] mt-1 transition-colors ${
+                    isActive ? "text-terracotta font-semibold" : "text-gray-500"
                   }`}
                 >
                   {item.label}
