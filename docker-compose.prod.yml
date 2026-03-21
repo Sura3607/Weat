@@ -40,10 +40,8 @@ services:
       - "443:443"
     volumes:
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      # Tạm thời tắt mount chứng chỉ SSL vì bạn chưa setup Certbot trên EC2 mới
-      # Nếu để nguyên Nginx sẽ báo lỗi không tìm thấy thư mục Let's Encrypt
-      # - /etc/letsencrypt:/etc/letsencrypt:ro
-      # - /var/www/certbot:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     networks:
       - weat-net
 

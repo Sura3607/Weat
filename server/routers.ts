@@ -13,6 +13,44 @@ import { sendToUser } from "./websocket";
 import { signJwt } from "./_core/jwt";
 import * as db from "./db";
 
+function extractAssistantText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (part && typeof part === "object" && "type" in part && (part as any).type === "text") {
+          return String((part as any).text ?? "");
+        }
+        return "";
+      })
+      .join("\n")
+      .trim();
+  }
+  return "";
+}
+
+function parseAssistantJson(content: unknown): Record<string, unknown> | null {
+  const text = extractAssistantText(content);
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    // Fallback: extract JSON object from markdown or extra surrounding text
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      const maybeJson = text.slice(start, end + 1);
+      try {
+        return JSON.parse(maybeJson) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
 export const appRouter = router({
   system: systemRouter,
 
@@ -267,7 +305,7 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
               {
                 role: "user",
                 content: [
-                  { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+                  { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
                   { type: "text", text: "Is this image of food or drinks?" },
                 ],
               },
@@ -291,17 +329,31 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
             },
           });
 
-          const content = response.choices[0]?.message?.content;
-          if (typeof content === "string") {
-            const result = JSON.parse(content);
-            return { isFood: result.isFood, confidence: result.confidence, reason: result.reason };
+          const result = parseAssistantJson(response.choices[0]?.message?.content);
+          if (result) {
+            return {
+              isFood: Boolean(result.isFood),
+              confidence: Number(result.confidence ?? 0.5),
+              reason: String(result.reason ?? "Không thể xác định"),
+              aiAvailable: true,
+            };
           }
           // If parsing fails, allow upload (fail-open)
-          return { isFood: true, confidence: 0.5, reason: "Không thể xác định" };
+          return {
+            isFood: true,
+            confidence: 0.5,
+            reason: "AI trả dữ liệu không hợp lệ, cho phép đăng",
+            aiAvailable: false,
+          };
         } catch (err) {
           console.error("[AI] Food validation failed:", err);
           // Fail-open: allow upload if validation fails
-          return { isFood: true, confidence: 0, reason: "Lỗi hệ thống, cho phép upload" };
+          return {
+            isFood: true,
+            confidence: 0,
+            reason: "AI tạm thời không khả dụng, cho phép đăng",
+            aiAvailable: false,
+          };
         }
       }),
 
@@ -317,6 +369,9 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
         locationName: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        let aiValidationAvailable = true;
+        let aiAnalysisAvailable = false;
+
         // 0. AI Vision Validation - Check if image is food/drink
         try {
           const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
@@ -329,7 +384,7 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
               {
                 role: "user",
                 content: [
-                  { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+                  { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
                   { type: "text", text: "Is this food or drink?" },
                 ],
               },
@@ -348,20 +403,18 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
               },
             },
           });
-          const checkContent = validationResponse.choices[0]?.message?.content;
-          if (typeof checkContent === "string") {
-            const checkResult = JSON.parse(checkContent);
-            if (!checkResult.isFood) {
+          const checkResult = parseAssistantJson(validationResponse.choices[0]?.message?.content);
+          if (checkResult && !checkResult.isFood) {
               throw new TRPCError({
                 code: "BAD_REQUEST",
                 message: "Ch\u1EC9 \u0111\u01B0\u1EE3c ph\u00E9p \u0111\u0103ng \u1EA3nh \u0111\u1ED3 \u0103n/n\u01B0\u1EDBc u\u1ED1ng!",
               });
-            }
           }
         } catch (err) {
           // Re-throw TRPCError (our validation error)
           if (err instanceof TRPCError) throw err;
           // Otherwise fail-open: allow upload if AI validation itself fails
+          aiValidationAvailable = false;
           console.error("[AI] Food validation in create failed:", err);
         }
 
@@ -391,7 +444,7 @@ Return ONLY valid JSON, no markdown.`;
               {
                 role: "user",
                 content: [
-                  { type: "image_url", image_url: { url: analysisDataUrl, detail: "low" } },
+                  { type: "image_url", image_url: { url: analysisDataUrl, detail: "high" } },
                   { type: "text", text: "Analyze this food image." },
                 ],
               },
@@ -418,12 +471,40 @@ Return ONLY valid JSON, no markdown.`;
             },
           });
 
-          const content = response.choices[0]?.message?.content;
-          if (typeof content === "string") {
-            aiResult = JSON.parse(content);
+          const parsed = parseAssistantJson(response.choices[0]?.message?.content);
+          if (parsed) {
+            aiResult = parsed;
+            aiAnalysisAvailable = true;
+          } else {
+            throw new Error("AI response is not valid JSON");
           }
         } catch (err) {
-          console.error("[AI] Food analysis failed:", err);
+          console.error("[AI] Food analysis failed (strict schema):", err);
+
+          // Retry with a more permissive response format for models/proxies
+          try {
+            const retryResponse = await invokeLLM({
+              messages: [
+                { role: "system", content: "Analyze food image and return a single JSON object with keys: dishName, dishNameVi, category, ingredients, calories, tags." },
+                {
+                  role: "user",
+                  content: [
+                    { type: "image_url", image_url: { url: analysisDataUrl, detail: "auto" } },
+                    { type: "text", text: "Return ONLY JSON." },
+                  ],
+                },
+              ],
+              response_format: { type: "json_object" },
+            });
+
+            const retryParsed = parseAssistantJson(retryResponse.choices[0]?.message?.content);
+            if (retryParsed) {
+              aiResult = retryParsed;
+              aiAnalysisAvailable = true;
+            }
+          } catch (retryErr) {
+            console.error("[AI] Food analysis fallback failed:", retryErr);
+          }
         }
 
         // 3. Save to DB
@@ -455,7 +536,13 @@ Return ONLY valid JSON, no markdown.`;
           }
         }
 
-        return { id: logId, imageUrl, analysis: aiResult };
+        return {
+          id: logId,
+          imageUrl,
+          analysis: aiResult,
+          aiValidationAvailable,
+          aiAnalysisAvailable,
+        };
       }),
 
     feed: publicProcedure
