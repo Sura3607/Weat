@@ -217,19 +217,19 @@ export default function FeedPage() {
   };
 
   return (
-    <div className="page-enter pb-24 max-w-md mx-auto">
+    <div className="page-enter pb-32 max-w-md mx-auto bg-[#FAF8F5] min-h-screen">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3">
-        <h1 className="text-xl font-bold text-foreground">Feed</h1>
-        <p className="text-xs text-muted-foreground">Khám phá món ăn từ mọi người</p>
+      <div className="sticky top-0 z-40 bg-[#FAF8F5]/80 backdrop-blur-md border-b border-orange-900/10 shadow-sm px-5 py-4">
+        <h1 className="text-2xl font-bold text-[#D9774A]">Feed</h1>
+        <p className="text-sm text-stone-500 mt-1">Khám phá món ăn từ mọi người</p>
       </div>
 
       {/* Feed list */}
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-6">
         {isLoading && (
           <>
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="overflow-hidden">
+              <Card key={i} className="overflow-hidden rounded-3xl shadow-sm">
                 <Skeleton className="w-full aspect-square" />
                 <div className="p-4 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
@@ -252,16 +252,16 @@ export default function FeedPage() {
           const groupedReactions = Object.entries(reactionCounts);
 
           return (
-            <Card key={log.id} className="overflow-hidden bg-card border-border/50 shadow-sm">
+            <Card key={log.id} className="overflow-hidden bg-white border-gray-100 shadow-md rounded-3xl">
               {/* User info header */}
-              <div className="flex items-center gap-3 p-3 pb-0">
+              <div className="flex items-center gap-3 p-4 pb-2">
                 <button
                   onClick={() => handleOpenProfile(log.userId)}
                   className="shrink-0 cursor-pointer"
                 >
-                  <Avatar className="w-8 h-8">
+                  <Avatar className="w-10 h-10 ring-2 ring-gray-100">
                     <AvatarImage src={log.userAvatar || undefined} />
-                    <AvatarFallback className="bg-terracotta/20 text-terracotta text-xs">
+                    <AvatarFallback className="bg-terracotta/10 text-terracotta text-sm font-semibold">
                       {(log.userName || "?")[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -269,17 +269,17 @@ export default function FeedPage() {
                 <div className="flex-1 min-w-0">
                   <button
                     onClick={() => handleOpenProfile(log.userId)}
-                    className="text-sm font-medium truncate hover:underline cursor-pointer text-left"
+                    className="text-sm font-semibold text-gray-900 truncate hover:underline cursor-pointer text-left"
                   >
                     {log.userName || "Người dùng"}
                   </button>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-500">
                     {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: vi })}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
                   {log.calories && (
-                    <div className="flex items-center gap-1 text-xs text-ochre font-medium mr-1">
+                    <div className="flex items-center gap-1 text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-1 rounded-full">
                       <Flame className="w-3.5 h-3.5" />
                       {log.calories} cal
                     </div>
@@ -288,16 +288,16 @@ export default function FeedPage() {
                   {isOwner && (
                     <button
                       onClick={() => handleDeletePost(log.id)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Food image */}
-              <div className="mt-2">
+              <div className="mt-1">
                 <img
                   src={log.imageUrl}
                   alt={log.dishName || "Food"}
@@ -307,13 +307,13 @@ export default function FeedPage() {
               </div>
 
               {/* Action buttons row */}
-              <div className="flex items-center gap-1 px-3 pt-2">
+              <div className="flex items-center gap-2 px-4 pt-3 pb-2">
                 {/* Reaction button */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                      <SmilePlus className="w-4 h-4" />
-                      <span className="text-xs">React</span>
+                    <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors text-gray-600 hover:text-gray-900">
+                      <SmilePlus className="w-5 h-5" />
+                      <span className="text-sm font-medium">React</span>
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-2" side="top" align="start">
@@ -322,7 +322,7 @@ export default function FeedPage() {
                         <button
                           key={item.emoji}
                           onClick={() => handleReaction(log.id, item.emoji)}
-                          className="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-2xl transition-transform hover:scale-125"
+                          className="w-11 h-11 rounded-xl hover:bg-gray-100 flex items-center justify-center text-2xl transition-transform hover:scale-125"
                           title={item.label}
                         >
                           {item.emoji}
@@ -336,25 +336,25 @@ export default function FeedPage() {
                 {!isOwner && (
                   <button
                     onClick={() => handleOpenChat(log.userId, log.userName, log.userAvatar)}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors text-gray-600 hover:text-gray-900"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="text-xs">Nhắn tin</span>
+                    <MessageCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Nhắn tin</span>
                   </button>
                 )}
               </div>
 
               {/* Reactions display */}
               {groupedReactions.length > 0 && (
-                <div className="px-3 pb-1">
-                  <div className="flex items-center gap-1 flex-wrap">
+                <div className="px-4 pb-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {groupedReactions.map(([emoji, count]) => (
-                      <div key={emoji} className="flex items-center gap-0.5">
-                        <span className="text-sm">{emoji}</span>
-                        {count > 1 && <span className="text-xs text-muted-foreground">{count}</span>}
+                      <div key={emoji} className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                        <span className="text-base">{emoji}</span>
+                        {count > 1 && <span className="text-xs text-gray-600 font-medium">{count}</span>}
                       </div>
                     ))}
-                    <span className="text-xs text-muted-foreground ml-1">
+                    <span className="text-xs text-gray-500 ml-1">
                       {reactions.length} reaction{reactions.length > 1 ? "s" : ""}
                     </span>
                   </div>
@@ -362,20 +362,20 @@ export default function FeedPage() {
               )}
 
               {/* Info */}
-              <div className="p-3 pt-1 space-y-2">
+              <div className="p-4 pt-2 space-y-3">
                 <div>
-                  <h3 className="font-semibold text-base">
+                  <h3 className="font-semibold text-lg text-gray-900">
                     {log.dishNameVi || log.dishName || "Món ăn"}
                   </h3>
                   {log.dishNameVi && log.dishName && (
-                    <p className="text-xs text-muted-foreground">{log.dishName}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{log.dishName}</p>
                   )}
                 </div>
 
                 {log.locationName && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="w-3 h-3" />
-                    {log.locationName}
+                  <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                    <MapPin className="w-4 h-4" />
+                    <span>{log.locationName}</span>
                   </div>
                 )}
 
@@ -384,14 +384,14 @@ export default function FeedPage() {
                   const tags = log.tags as string[] | null;
                   if (!tags || !Array.isArray(tags) || tags.length === 0) return null;
                   return (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {tags.slice(0, 5).map((tag: string, i: number) => (
                         <Badge
                           key={i}
                           variant="secondary"
-                          className="text-[10px] px-2 py-0.5 bg-sage-light text-sage-dark border-0"
+                          className="text-xs px-3 py-1 bg-sage/20 text-sage-dark font-medium rounded-full border-0"
                         >
-                          {tag}
+                          #{tag}
                         </Badge>
                       ))}
                     </div>
@@ -399,7 +399,7 @@ export default function FeedPage() {
                 })()}
 
                 {log.voiceNote && (
-                  <p className="text-xs text-muted-foreground italic">"{log.voiceNote}"</p>
+                  <p className="text-sm text-gray-500 italic border-l-2 border-terracotta pl-3">"{log.voiceNote}"</p>
                 )}
               </div>
             </Card>
