@@ -1,153 +1,139 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { trpc } from "@/lib/trpc";
-import { MapPin, Navigation, Star, Loader2 } from "lucide-react";
-import { useMemo, useEffect, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Utensils, MapPin, Sparkles } from "lucide-react";
 
-type Props = {
-  data: any;
-  onClose: () => void;
-  position: { latitude: number; longitude: number } | null;
-};
-
-function Fireworks() {
-  const particles = Array.from({ length: 20 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    color: ["#C2703E", "#D4A855", "#7A9B6D", "#E8C07A", "#B85C3A"][Math.floor(Math.random() * 5)],
-    delay: Math.random() * 0.5,
-    size: 4 + Math.random() * 8,
-  }));
-
-  return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden z-50">
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          className="absolute rounded-full animate-float-up"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: p.size,
-            height: p.size,
-            backgroundColor: p.color,
-            animationDelay: `${p.delay}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
+interface MatchPopupProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user1: {
+    name: string;
+    avatarUrl?: string;
+  };
+  user2: {
+    name: string;
+    avatarUrl?: string;
+  };
+  onGetDirections: () => void;
 }
 
-export default function MatchPopup({ data, onClose, position }: Props) {
-  const [showFireworks, setShowFireworks] = useState(true);
-
-  const venueInput = useMemo(() => {
-    if (!position) return null;
-    return {
-      latitude: position.latitude,
-      longitude: position.longitude,
-      query: data?.craving || "restaurant",
-    };
-  }, [position?.latitude, position?.longitude, data?.craving]);
-
-  const { data: venues, isLoading: venuesLoading } = trpc.venues.suggest.useQuery(
-    venueInput!,
-    { enabled: !!venueInput }
-  );
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowFireworks(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const openGoogleMaps = (lat: number, lng: number, name: string) => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${encodeURIComponent(name)}`;
-    window.open(url, "_blank");
-  };
-
+export default function MatchPopup({
+  open,
+  onOpenChange,
+  user1,
+  user2,
+  onGetDirections,
+}: MatchPopupProps) {
   return (
-    <Dialog open={true} onOpenChange={() => onClose()}>
-      <DialogContent className="bg-cream border-none rounded-3xl max-w-sm mx-auto overflow-hidden p-0">
-        {showFireworks && <Fireworks />}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden border-0 bg-gradient-to-br from-terracotta via-terracotta-light to-ochre">
+        {/* Confetti animation background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(20)].map((_, i) => (
+            <div
+              key={i}
+              className="confetti"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 2}s`,
+                backgroundColor: ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF", "#FF85A2"][
+                  Math.floor(Math.random() * 5)
+                ],
+              }}
+            />
+          ))}
+        </div>
 
-        <div className="relative p-6 text-center">
-          {/* Match header */}
-          <div className="mb-6">
-            <div className="text-5xl mb-2">🎉</div>
-            <h2 className="font-display text-3xl font-bold text-terracotta">MATCH!</h2>
-            <p className="text-muted-foreground mt-2">
-              {data?.senderName || "Ai đó"} muốn đi ăn{" "}
-              <span className="text-terracotta font-semibold">{data?.craving || "cùng bạn"}</span>!
-            </p>
+        <div className="relative p-8 text-center">
+          {/* MATCH text */}
+          <h2 className="text-4xl font-black text-white mb-2 drop-shadow-lg">
+            MATCH! 🎉
+          </h2>
+          <p className="text-white/90 text-sm mb-8">
+            Bạn và {user2.name} muốn ăn cùng!
+          </p>
+
+          {/* Avatars connection */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <Avatar className="w-20 h-20 border-4 border-white shadow-xl">
+              <AvatarImage src={user1.avatarUrl} />
+              <AvatarFallback className="bg-white/20 text-white text-xl">
+                {user1.name[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="w-12 h-12 rounded-full bg-white/30 flex items-center justify-center">
+              <Utensils className="w-6 h-6 text-white" />
+            </div>
+
+            <Avatar className="w-20 h-20 border-4 border-white shadow-xl">
+              <AvatarImage src={user2.avatarUrl} />
+              <AvatarFallback className="bg-white/20 text-white text-xl">
+                {user2.name[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
 
-          {/* Venue suggestions */}
-          <div className="text-left space-y-2 mb-4">
-            <h3 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-              <Star className="w-4 h-4 text-ochre" />
-              Quán gợi ý gần đây
-            </h3>
-            {venuesLoading ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="w-5 h-5 text-terracotta animate-spin" />
-              </div>
-            ) : venues && venues.length > 0 ? (
-              <div className="space-y-2">
-                {venues.slice(0, 3).map((v: any, i: number) => (
-                  <div
-                    key={i}
-                    className="bg-card rounded-xl p-3 border border-border flex items-center gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{v.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{v.address}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {v.rating && (
-                          <span className="text-xs text-ochre flex items-center gap-0.5">
-                            <Star className="w-3 h-3 fill-current" /> {v.rating}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => openGoogleMaps(v.lat, v.lng, v.name)}
-                      className="w-9 h-9 rounded-full bg-sage/20 flex items-center justify-center shrink-0"
-                    >
-                      <Navigation className="w-4 h-4 text-sage" />
-                    </button>
+          {/* Suggestion cards */}
+          <div className="space-y-3 mb-8">
+            <p className="text-white/90 text-sm font-medium">Quán ăn gợi ý:</p>
+            <Card className="bg-white/20 backdrop-blur-sm border-white/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-white" />
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground py-2">Không tìm thấy quán gần đây</p>
-            )}
+                  <div className="flex-1 text-left">
+                    <p className="text-white font-semibold">Quán Bún Bò Huế</p>
+                    <p className="text-white/80 text-xs">150m • 4.5 ⭐</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2">
+          {/* Action buttons */}
+          <div className="space-y-3">
             <Button
-              onClick={onClose}
-              variant="outline"
-              className="flex-1 rounded-xl border-border"
+              size="lg"
+              className="w-full bg-white text-terracotta hover:bg-white/90 py-6 rounded-2xl text-base font-semibold shadow-lg"
+              onClick={onGetDirections}
             >
-              Đóng
+              <MapPin className="w-5 h-5 mr-2" />
+              Chỉ đường
             </Button>
-            {venues && venues.length > 0 && (
-              <Button
-                onClick={() => {
-                  const v = venues[0];
-                  openGoogleMaps(v.lat, v.lng, v.name);
-                }}
-                className="flex-1 bg-terracotta hover:bg-terracotta/90 text-white rounded-xl"
-              >
-                <MapPin className="w-4 h-4 mr-1" />
-                Dẫn đường
-              </Button>
-            )}
+
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full border-2 border-white text-white hover:bg-white/20 py-6 rounded-2xl text-base"
+              onClick={() => onOpenChange(false)}
+            >
+              Để sau
+            </Button>
           </div>
         </div>
+
+        <style>{`
+          @keyframes confetti-fall {
+            0% {
+              transform: translateY(-100%) rotate(0deg);
+              opacity: 1;
+            }
+            100% {
+              transform: translateY(500px) rotate(720deg);
+              opacity: 0;
+            }
+          }
+          .confetti {
+            position: absolute;
+            top: -20px;
+            width: 10px;
+            height: 10px;
+            animation: confetti-fall 3s linear infinite;
+          }
+        `}</style>
       </DialogContent>
     </Dialog>
   );

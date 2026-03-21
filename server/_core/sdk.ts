@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { verifyJwt, type JwtPayload } from "./jwt";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -14,7 +15,6 @@ import type {
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
 } from "./types/manusTypes";
-// Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
@@ -31,11 +31,6 @@ const GET_USER_INFO_WITH_JWT_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserI
 class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
     console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
-    if (!ENV.oAuthServerUrl) {
-      console.error(
-        "[OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable."
-      );
-    }
   }
 
   private decodeState(state: string): string {
@@ -74,6 +69,17 @@ class OAuthService {
 
     return data;
   }
+
+  async getUserInfoWithJwt(
+    payload: GetUserInfoWithJwtRequest
+  ): Promise<GetUserInfoWithJwtResponse> {
+    const { data } = await this.client.post<GetUserInfoWithJwtResponse>(
+      GET_USER_INFO_WITH_JWT_PATH,
+      payload
+    );
+
+    return data;
+  }
 }
 
 const createOAuthHttpClient = (): AxiosInstance =>
@@ -82,13 +88,25 @@ const createOAuthHttpClient = (): AxiosInstance =>
     timeout: AXIOS_TIMEOUT_MS,
   });
 
-class SDKServer {
-  private readonly client: AxiosInstance;
-  private readonly oauthService: OAuthService;
+function assertOAuthConfigured(): void {
+  if (!ENV.oAuthServerUrl) {
+    throw new Error(
+      "[OAuth] OAUTH_SERVER_URL is not configured. Set OAUTH_SERVER_URL before using Manus OAuth routes."
+    );
+  }
+}
 
-  constructor(client: AxiosInstance = createOAuthHttpClient()) {
-    this.client = client;
-    this.oauthService = new OAuthService(this.client);
+class SDKServer {
+  private oauthService: OAuthService | null = null;
+
+  constructor() {}
+
+  private getOAuthService(): OAuthService {
+    if (!this.oauthService) {
+      assertOAuthConfigured();
+      this.oauthService = new OAuthService(createOAuthHttpClient());
+    }
+    return this.oauthService;
   }
 
   private deriveLoginMethod(
@@ -122,7 +140,7 @@ class SDKServer {
     code: string,
     state: string
   ): Promise<ExchangeTokenResponse> {
-    return this.oauthService.getTokenByCode(code, state);
+    return this.getOAuthService().getTokenByCode(code, state);
   }
 
   /**
@@ -131,7 +149,7 @@ class SDKServer {
    * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
    */
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
-    const data = await this.oauthService.getUserInfoByToken({
+    const data = await this.getOAuthService().getUserInfoByToken({
       accessToken,
     } as ExchangeTokenResponse);
     const loginMethod = this.deriveLoginMethod(
@@ -236,10 +254,7 @@ class SDKServer {
       projectId: ENV.appId,
     };
 
-    const { data } = await this.client.post<GetUserInfoWithJwtResponse>(
-      GET_USER_INFO_WITH_JWT_PATH,
-      payload
-    );
+    const data = await this.getOAuthService().getUserInfoWithJwt(payload);
 
     const loginMethod = this.deriveLoginMethod(
       (data as any)?.platforms,
@@ -256,6 +271,27 @@ class SDKServer {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
+
+    if (!sessionCookie) {
+      throw ForbiddenError("Missing session cookie");
+    }
+
+    // Try traditional JWT authentication first
+    const jwtPayload = await verifyJwt(sessionCookie);
+    if (jwtPayload) {
+      const user = await db.getUserById(jwtPayload.userId);
+      if (user) {
+        // Update last signed in
+        await db.upsertUser({
+          openId: user.openId ?? String(user.id),
+          email: user.email,
+          lastSignedIn: new Date(),
+        });
+        return user;
+      }
+    }
+
+    // Fallback to OAuth session verification
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {

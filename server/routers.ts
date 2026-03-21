@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { invokeLLM } from "./_core/llm";
 import { makeRequest, type PlacesSearchResult } from "./_core/map";
@@ -9,6 +10,7 @@ import { transcribeAudio } from "./_core/voiceTranscription";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 import { sendToUser } from "./websocket";
+import { signJwt } from "./_core/jwt";
 import * as db from "./db";
 
 export const appRouter = router({
@@ -21,6 +23,91 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    register: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        name: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Check if user already exists
+        const existingUser = await db.getUserByEmail(input.email);
+        if (existingUser) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Email already registered",
+          });
+        }
+
+        // Hash password
+        const passwordHash = await bcrypt.hash(input.password, 10);
+
+        // Create user
+        const userId = await db.createUserWithEmail({
+          email: input.email,
+          passwordHash,
+          name: input.name ?? null,
+        });
+
+        // Sign JWT
+        const token = await signJwt({ userId, email: input.email });
+
+        // Set cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+
+        const user = await db.getUserById(userId);
+        return {
+          success: true,
+          user: {
+            id: user!.id,
+            email: user!.email,
+            name: user!.name,
+            avatarUrl: user!.avatarUrl,
+          },
+        };
+      }),
+    login: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Find user by email
+        const user = await db.getUserByEmail(input.email);
+        if (!user || !user.passwordHash) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Invalid email or password",
+          });
+        }
+
+        // Verify password
+        const valid = await bcrypt.compare(input.password, user.passwordHash);
+        if (!valid) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Invalid email or password",
+          });
+        }
+
+        // Sign JWT
+        const token = await signJwt({ userId: user.id, email: user.email });
+
+        // Set cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
+
+        return {
+          success: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+          },
+        };
+      }),
   }),
 
   // ─── Profile ─────────────────────────────────────────────────────
@@ -64,6 +151,76 @@ export const appRouter = router({
         return { url };
       }),
   }),
+
+    // ─── Legacy Client Aliases ───────────────────────────────────────
+    craving: router({
+      set: protectedProcedure
+        .input(z.object({ craving: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+          await db.updateUserProfile(ctx.user.id, { currentCraving: input.craving });
+          return { success: true };
+        }),
+    }),
+
+    food: router({
+      feed: publicProcedure
+        .input(z.object({ limit: z.number().default(50), offset: z.number().default(0) }).optional())
+        .query(async ({ input }) => {
+          const { limit = 50, offset = 0 } = input || {};
+          return db.getFeedLogs(limit, offset);
+        }),
+
+      myLogs: protectedProcedure
+        .input(z.object({ limit: z.number().default(50), offset: z.number().default(0) }).optional())
+        .query(async ({ ctx, input }) => {
+          const { limit = 50, offset = 0 } = input || {};
+          return db.getFoodLogsByUser(ctx.user.id, limit, offset);
+        }),
+    }),
+
+    location: router({
+      radar: protectedProcedure
+        .input(z.object({ latitude: z.number(), longitude: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const nearbyUsers = await db.getNearbyUsers(ctx.user.id, input.latitude, input.longitude, 0.2);
+          return nearbyUsers.map((u) => ({
+            ...u,
+            distanceM: Math.round((u.distance || 0) * 1000),
+            compatibility: computeCompatibility(ctx.user.foodDna, u.foodDna),
+            isFriend: false,
+          }));
+        }),
+    }),
+
+    venues: router({
+      suggest: protectedProcedure
+        .input(z.object({
+          latitude: z.number(),
+          longitude: z.number(),
+          query: z.string().optional(),
+        }))
+        .query(async ({ input }) => {
+          const keyword = input.query || "restaurant";
+          const result = await makeRequest<PlacesSearchResult>(
+            "/maps/api/place/nearbysearch/json",
+            {
+              location: `${input.latitude},${input.longitude}`,
+              radius: 500,
+              type: "restaurant",
+              keyword,
+            }
+          );
+          return result.results.slice(0, 10).map((p) => ({
+            placeId: p.place_id,
+            name: p.name,
+            address: p.formatted_address,
+            lat: p.geometry.location.lat,
+            lng: p.geometry.location.lng,
+            rating: p.rating,
+            totalRatings: p.user_ratings_total,
+          }));
+        }),
+    }),
 
   // ─── Food Logs ───────────────────────────────────────────────────
   foodLog: router({
@@ -211,6 +368,39 @@ Return ONLY valid JSON, no markdown.`;
 
   // ─── Match ───────────────────────────────────────────────────────
   match: router({
+    invite: protectedProcedure
+      .input(z.object({
+        receiverId: z.number(),
+        craving: z.string().optional(),
+        venueName: z.string().optional(),
+        venueAddress: z.string().optional(),
+        venueLat: z.number().optional(),
+        venueLng: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const inviteId = await db.createMatchInvite({
+          senderId: ctx.user.id,
+          receiverId: input.receiverId,
+          senderCraving: input.craving || null,
+          venueName: input.venueName || null,
+          venueAddress: input.venueAddress || null,
+          venueLat: input.venueLat || null,
+          venueLng: input.venueLng || null,
+        });
+
+        sendToUser(input.receiverId, {
+          type: "match_invite",
+          inviteId,
+          senderId: ctx.user.id,
+          senderName: ctx.user.name,
+          senderAvatar: ctx.user.avatarUrl,
+          craving: input.craving,
+          venueName: input.venueName,
+        });
+
+        return { inviteId };
+      }),
+
     sendInvite: protectedProcedure
       .input(z.object({
         receiverId: z.number(),
@@ -275,7 +465,7 @@ Return ONLY valid JSON, no markdown.`;
           }
         }
 
-        return { success: true };
+        return { success: true, status };
       }),
 
     invites: protectedProcedure.query(async ({ ctx }) => {

@@ -22,6 +22,20 @@
       "when": 1774066498768,
       "tag": "0002_dashing_bloodstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1774090404120,
+      "tag": "0003_gigantic_darkhawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1774093261746,
+      "tag": "0004_groovy_thor",
+      "breakpoints": true
     }
   ]
 }
