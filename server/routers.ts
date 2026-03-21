@@ -369,7 +369,8 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
         const key = `food/${ctx.user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { url: imageUrl } = await storagePut(key, buffer, input.mimeType);
 
-        // 2. AI analysis
+        // 2. AI analysis (use base64 data URL so LLM can always access the image)
+        const analysisDataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
         let aiResult: Record<string, unknown> = {};
         try {
           const systemPrompt = `You are a food analysis AI. Analyze the food image and return JSON with these fields:
@@ -388,7 +389,7 @@ Return ONLY valid JSON, no markdown.`;
               {
                 role: "user",
                 content: [
-                  { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
+                  { type: "image_url", image_url: { url: analysisDataUrl, detail: "low" } },
                   { type: "text", text: "Analyze this food image." },
                 ],
               },

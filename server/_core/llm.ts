@@ -140,15 +140,23 @@ const normalizeResponseFormat = ({
 // ─── API Resolution ───────────────────────────────────────────────
 
 /**
- * Priority: OpenAI API key → Manus Forge API
+ * Priority:
+ * 1. OPENAI_BASE_URL + OPENAI_API_KEY (proxy or direct OpenAI)
+ * 2. OPENAI_API_KEY with default OpenAI URL
+ * 3. Manus Forge API (fallback)
  */
 function resolveApiConfig(): { url: string; apiKey: string; model: string } {
-  // 1. Direct OpenAI API
+  // 1. OpenAI API key available
   if (ENV.openaiApiKey) {
+    // Check for custom base URL (proxy like Manus LLM proxy)
+    const baseUrl = process.env.OPENAI_BASE_URL
+      || process.env.OPENAI_API_BASE
+      || "https://api.openai.com/v1";
+    const url = baseUrl.replace(/\/+$/, "") + "/chat/completions";
     return {
-      url: "https://api.openai.com/v1/chat/completions",
+      url,
       apiKey: ENV.openaiApiKey,
-      model: ENV.openaiModel || "gpt-4o-mini",
+      model: ENV.openaiModel || "gpt-4.1-mini",
     };
   }
 
@@ -185,6 +193,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   const normalizedResponseFormat = normalizeResponseFormat({ responseFormat, response_format, outputSchema, output_schema });
   if (normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
+
+  console.log(`[LLM] Calling ${config.url} with model ${config.model}`);
 
   const response = await fetch(config.url, {
     method: "POST",
