@@ -8,6 +8,22 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
+function injectAnalyticsScript() {
+  if (typeof document === "undefined") return;
+
+  const env = import.meta.env as Record<string, string | undefined>;
+  const endpoint = env.VITE_ANALYTICS_ENDPOINT?.trim();
+  const websiteId = env.VITE_ANALYTICS_WEBSITE_ID?.trim();
+
+  if (!endpoint || !websiteId) return;
+
+  const script = document.createElement("script");
+  script.defer = true;
+  script.src = `${endpoint.replace(/\/$/, "")}/umami`;
+  script.setAttribute("data-website-id", websiteId);
+  document.head.appendChild(script);
+}
+
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
@@ -51,6 +67,8 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+
+injectAnalyticsScript();
 
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
