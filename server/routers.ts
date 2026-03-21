@@ -335,14 +335,25 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
               isFood: Boolean(result.isFood),
               confidence: Number(result.confidence ?? 0.5),
               reason: String(result.reason ?? "Không thể xác định"),
+              aiAvailable: true,
             };
           }
           // If parsing fails, allow upload (fail-open)
-          return { isFood: true, confidence: 0.5, reason: "Không thể xác định" };
+          return {
+            isFood: true,
+            confidence: 0.5,
+            reason: "AI trả dữ liệu không hợp lệ, cho phép đăng",
+            aiAvailable: false,
+          };
         } catch (err) {
           console.error("[AI] Food validation failed:", err);
           // Fail-open: allow upload if validation fails
-          return { isFood: true, confidence: 0, reason: "Lỗi hệ thống, cho phép upload" };
+          return {
+            isFood: true,
+            confidence: 0,
+            reason: "AI tạm thời không khả dụng, cho phép đăng",
+            aiAvailable: false,
+          };
         }
       }),
 
@@ -351,11 +362,16 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
         imageBase64: z.string(),
         mimeType: z.string().default("image/jpeg"),
         voiceNote: z.string().optional(),
+        caption: z.string().optional(),
+        rating: z.number().min(1).max(5).optional(),
         latitude: z.number().optional(),
         longitude: z.number().optional(),
         locationName: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        let aiValidationAvailable = true;
+        let aiAnalysisAvailable = false;
+
         // 0. AI Vision Validation - Check if image is food/drink
         try {
           const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
@@ -398,6 +414,7 @@ Be lenient - if there's any food or drink visible in the image, even partially, 
           // Re-throw TRPCError (our validation error)
           if (err instanceof TRPCError) throw err;
           // Otherwise fail-open: allow upload if AI validation itself fails
+          aiValidationAvailable = false;
           console.error("[AI] Food validation in create failed:", err);
         }
 
@@ -457,6 +474,7 @@ Return ONLY valid JSON, no markdown.`;
           const parsed = parseAssistantJson(response.choices[0]?.message?.content);
           if (parsed) {
             aiResult = parsed;
+            aiAnalysisAvailable = true;
           } else {
             throw new Error("AI response is not valid JSON");
           }
@@ -482,6 +500,7 @@ Return ONLY valid JSON, no markdown.`;
             const retryParsed = parseAssistantJson(retryResponse.choices[0]?.message?.content);
             if (retryParsed) {
               aiResult = retryParsed;
+              aiAnalysisAvailable = true;
             }
           } catch (retryErr) {
             console.error("[AI] Food analysis fallback failed:", String(retryErr).slice(0, 300));
@@ -500,6 +519,8 @@ Return ONLY valid JSON, no markdown.`;
           tags: aiResult.tags || null,
           aiAnalysis: aiResult,
           voiceNote: input.voiceNote || null,
+          caption: input.caption || null,
+          rating: input.rating || null,
           latitude: input.latitude || null,
           longitude: input.longitude || null,
           locationName: input.locationName || null,
@@ -515,7 +536,13 @@ Return ONLY valid JSON, no markdown.`;
           }
         }
 
-        return { id: logId, imageUrl, analysis: aiResult };
+        return {
+          id: logId,
+          imageUrl,
+          analysis: aiResult,
+          aiValidationAvailable,
+          aiAnalysisAvailable,
+        };
       }),
 
     feed: publicProcedure
