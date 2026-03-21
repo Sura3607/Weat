@@ -37,7 +37,7 @@ COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 
 # Install production dependencies only
-RUN pnpm install --prod --ignore-scripts && pnpm add vite
+RUN pnpm install --prod --ignore-scripts
 
 # Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist
