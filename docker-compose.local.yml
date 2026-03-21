@@ -1,0 +1,25 @@
+# Local development - only MySQL, app runs with pnpm dev
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: weat-mysql-local
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: weat
+      MYSQL_USER: weat
+      MYSQL_PASSWORD: weatpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_local_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_local_data:
