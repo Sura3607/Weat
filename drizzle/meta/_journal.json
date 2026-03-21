@@ -15,6 +15,13 @@
       "when": 1773977100432,
       "tag": "0001_pink_natasha_romanoff",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774066498768,
+      "tag": "0002_dashing_bloodstrike",
+      "breakpoints": true
     }
   ]
 }
