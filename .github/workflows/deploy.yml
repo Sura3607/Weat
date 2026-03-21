@@ -3,6 +3,21 @@ name: Deploy to AWS EC2
 on:
   push:
     branches: [ main ] 
+    # Chỉ kích hoạt khi có thay đổi trong các thư mục/file dưới đây
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'shared/**'
+      - 'Dockerfile'
+      - 'docker-compose.prod.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+    # Hoặc cụ thể hơn là bỏ qua các file docs
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - '.prettierrc'
+      - '.prettierignore'
   workflow_dispatch:
 jobs:
   deploy:

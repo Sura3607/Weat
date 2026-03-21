@@ -6,8 +6,10 @@ import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
   // Dynamic import to avoid loading vite in production
-  const { createServer as createViteServer } = await import("vite");
-  const viteConfig = (await import("../../vite.config")).default;
+  const viteModule = await import("vite");
+  const viteConfigModule = await import("../../vite.config");
+  const createViteServer = viteModule.createServer;
+  const viteConfig = viteConfigModule.default;
 
   const serverOptions = {
     middlewareMode: true,
