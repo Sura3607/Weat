@@ -86,6 +86,13 @@ export default function CameraPage() {
         mimeType: "image/jpeg",
       });
 
+      if (!result.aiAvailable) {
+        toast.warning("AI đang lỗi tạm thời, vẫn cho phép đăng ảnh", {
+          description: result.reason,
+          duration: 4500,
+        });
+      }
+
       if (result.isFood) {
         setValidationState("valid");
         setValidationReason(result.reason);
@@ -180,7 +187,14 @@ export default function CameraPage() {
         latitude: latitude ?? undefined,
         longitude: longitude ?? undefined,
       });
-      toast.success(result.analysis?.dishNameVi ? `Đã lưu: ${result.analysis.dishNameVi}` : "Đã lưu food log!");
+      if (!result.aiValidationAvailable || !result.aiAnalysisAvailable) {
+        toast.warning("Đã lưu food log nhưng AI chưa phân tích được", {
+          description: "Kiểm tra OPENAI_API_KEY / OPENAI_MODEL hoặc log server [AI]",
+          duration: 5000,
+        });
+      } else {
+        toast.success(result.analysis?.dishNameVi ? `Đã lưu: ${result.analysis.dishNameVi}` : "Đã lưu food log!");
+      }
       // Invalidate feed & profile so they show the new food log immediately
       utils.foodLog.feed.invalidate();
       utils.foodLog.myLogs.invalidate();
@@ -196,7 +210,7 @@ export default function CameraPage() {
         toast.error("Không thể lưu food log");
       }
     }
-  }, [capturedImage, voiceNote, latitude, longitude, createFoodLog, navigate, validationState]);
+  }, [capturedImage, voiceNote, latitude, longitude, createFoodLog, navigate, validationState, utils]);
 
   if (authLoading) {
     return (
