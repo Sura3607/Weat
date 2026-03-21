@@ -1,5 +1,6 @@
-import { and, desc, eq, ne, sql } from "drizzle-orm";
+import mysql from "mysql2/promise";
 import { drizzle } from "drizzle-orm/mysql2";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import {
   InsertUser, users,
   InsertFoodLog, foodLogs,
@@ -12,16 +13,43 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: mysql.Pool | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const databaseUrl = process.env.DATABASE_URL;
+  
+  if (!databaseUrl) {
+    console.warn("[Database] DATABASE_URL is not set");
+    return null;
+  }
+
+  // Create pool if it doesn't exist
+  if (!_pool) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = mysql.createPool(databaseUrl, {
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 0,
+      });
+
+      // Test the connection
+      const connection = await _pool.getConnection();
+      await connection.ping();
+      connection.release();
+      
+      console.log("[Database] Connected successfully");
+      
+      _db = drizzle(_pool);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Failed to connect:", error);
+      _pool = null;
       _db = null;
+      return null;
     }
   }
+
   return _db;
 }
 
@@ -193,6 +221,8 @@ export async function getFeedLogs(limit = 50, offset = 0) {
     calories: foodLogs.calories,
     tags: foodLogs.tags,
     voiceNote: foodLogs.voiceNote,
+    caption: foodLogs.caption,
+    rating: foodLogs.rating,
     latitude: foodLogs.latitude,
     longitude: foodLogs.longitude,
     locationName: foodLogs.locationName,
