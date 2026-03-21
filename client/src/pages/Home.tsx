@@ -43,14 +43,24 @@ export default function Home() {
             <span className="text-terracotta font-medium">Cùng nhau thưởng thức.</span>
           </p>
 
-          <Button
-            size="lg"
-            className="mt-8 bg-terracotta hover:bg-terracotta-dark text-white px-8 py-6 text-base rounded-2xl shadow-lg"
-            onClick={() => { window.location.href = getLoginUrl(); }}
-          >
-            Bắt đầu ngay
-            <ChevronRight className="w-5 h-5 ml-1" />
-          </Button>
+          <div className="flex flex-col gap-3 mt-8">
+            <Button
+              size="lg"
+              className="bg-terracotta hover:bg-terracotta-dark text-white px-8 py-6 text-base rounded-2xl shadow-lg"
+              onClick={() => navigate("/login")}
+            >
+              Đăng nhập
+              <ChevronRight className="w-5 h-5 ml-1" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-terracotta text-terracotta hover:bg-terracotta/10 px-8 py-6 text-base rounded-2xl"
+              onClick={() => navigate("/register")}
+            >
+              Tạo tài khoản mới
+            </Button>
+          </div>
         </div>
       </div>
 

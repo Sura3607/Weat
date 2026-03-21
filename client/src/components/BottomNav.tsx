@@ -12,8 +12,8 @@ const navItems = [
 export default function BottomNav() {
   const [location] = useLocation();
 
-  // Hide on camera page
-  if (location === "/camera") return null;
+  // Hide on camera page and home page (before login)
+  if (location === "/camera" || location === "/") return null;
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card/95 backdrop-blur-md border-t border-border bottom-nav z-50">

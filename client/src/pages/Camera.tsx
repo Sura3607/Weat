@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { trpc } from "@/lib/trpc";
-import { Camera as CameraIcon, Mic, MicOff, RotateCcw, Check, Loader2, X } from "lucide-react";
+import { Camera as CameraIcon, Mic, MicOff, RotateCcw, Check, Loader2, X, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ export default function CameraPage() {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [voiceNote, setVoiceNote] = useState<string>("");
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -68,7 +69,13 @@ export default function CameraPage() {
     ctx.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     setCapturedImage(dataUrl);
+    setIsAnalyzing(true);
     if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+    
+    // Stop analyzing after 2 seconds (simulated)
+    setTimeout(() => {
+      setIsAnalyzing(false);
+    }, 2000);
   }, []);
 
   // Toggle camera
@@ -178,7 +185,28 @@ export default function CameraPage() {
             </div>
           </>
         ) : (
-          <img src={capturedImage} alt="Captured" className="w-full h-full object-cover" />
+          <>
+            <img src={capturedImage} alt="Captured" className="w-full h-full object-cover" />
+            
+            {/* Analyzing overlay */}
+            {isAnalyzing && (
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                {/* Scanner animation */}
+                <div className="absolute inset-0 overflow-hidden">
+                  <div className="scanner-line" />
+                </div>
+                
+                {/* Loading content */}
+                <div className="relative z-10 text-center">
+                  <div className="w-16 h-16 rounded-full bg-terracotta/20 flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-white animate-pulse" />
+                  </div>
+                  <p className="text-white text-lg font-medium">AI đang phân tích...</p>
+                  <p className="text-white/60 text-sm mt-1">Nhận diện món ăn từ hình ảnh</p>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

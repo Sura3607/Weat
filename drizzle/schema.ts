@@ -3,9 +3,10 @@ import { boolean, float, int, json, mysqlEnum, mysqlTable, text, timestamp, varc
 // ─── Users ───────────────────────────────────────────────────────────
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  openId: varchar("openId", { length: 64 }).unique(),
   name: text("name"),
-  email: varchar("email", { length: 320 }),
+  email: varchar("email", { length: 320 }).unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   avatarUrl: text("avatarUrl"),
@@ -19,7 +20,7 @@ export const users = mysqlTable("users", {
   isRadarActive: boolean("isRadarActive").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn").defaultNow(),
 });
 
 export type User = typeof users.$inferSelect;
