@@ -1,14 +1,16 @@
-# Local development - only MySQL, app runs with pnpm dev
+# Local development - Chạy cả MySQL và App tự động
 services:
   mysql:
     image: mysql:8.0
     container_name: weat-mysql-local
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: weat
-      MYSQL_USER: weat
-      MYSQL_PASSWORD: weatpassword
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
@@ -18,6 +20,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  app:
+    image: node:22-alpine
+    container_name: weat-app-local
+    working_dir: /app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount toàn bộ code bên ngoài vào trong container để code đến đâu app update đến đó
+      - .:/app
+      # Bỏ qua node_modules của máy host để tránh xung đột hệ điều hành
+      - /app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: >
+      sh -c "corepack enable && 
+             corepack prepare pnpm@10.4.1 --activate && 
+             pnpm install && 
+             pnpm db:push && 
+             pnpm dev"
 
 volumes:
   mysql_local_data:

@@ -1,6 +1,6 @@
 export const ENV = {
   // ─── App ────────────────────────────────────────────────────────
-  appId: process.env.VITE_APP_ID ?? "",
+  appId: process.env.VITE_APP_ID ?? "weat",
   cookieSecret: process.env.JWT_SECRET ?? "weat-dev-secret-change-me",
   databaseUrl: process.env.DATABASE_URL ?? "",
   isProduction: process.env.NODE_ENV === "production",

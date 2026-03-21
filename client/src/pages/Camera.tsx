@@ -8,7 +8,9 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 
 export default function CameraPage() {
-  const { user, loading: authLoading } = useAuth({ redirectOnUnauthenticated: true });
+  const { user, loading: authLoading } = useAuth({
+    redirectOnUnauthenticated: import.meta.env.PROD,
+  });
   const [, navigate] = useLocation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
