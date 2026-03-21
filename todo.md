@@ -21,3 +21,17 @@
 - [x] Bug fix: Vite WebSocket HMR connection failing (dev-only proxy issue, no code fix needed)
 - [x] Bug fix: Giao diện tối sau khi đăng nhập - force light mode for dark OS users
 - [ ] Bug fix: Landing page hoàn toàn đen trên thiết bị dark mode - CSS fix chưa đủ mạnh
+- [ ] Setup chạy local: .env.local, install dependencies, dev server
+- [ ] Setup EC2: Dockerfile, docker-compose.prod.yml, deploy script
+- [ ] Refactor auth: thay Manus OAuth bằng Google OAuth trực tiếp
+- [ ] Cập nhật frontend login flow cho Google OAuth
+- [ ] Tạo .env.example với tất cả env vars cần thiết
+- [ ] Tạo Dockerfile cho production build
+- [ ] Tạo docker-compose.prod.yml với MySQL + app + nginx
+- [ ] Tạo nginx config cho domain weat.compsci.studio với SSL
+- [ ] Tạo deploy script cho EC2
+- [ ] Refactor LLM: thay Manus Forge bằng OpenAI API trực tiếp
+- [ ] Refactor Storage: thay Manus Forge bằng AWS S3 trực tiếp
+- [ ] Refactor Maps: thay Manus Forge proxy bằng Google Maps API key
+- [ ] Refactor Voice: thay Manus Forge bằng OpenAI Whisper trực tiếp
+- [ ] Hướng dẫn setup Google Cloud Console OAuth credentials

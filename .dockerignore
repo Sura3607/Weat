@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.gitignore
+.manus-logs
+.env
+.env.*
+*.md
+docker/
+deploy.sh
+todo.md
