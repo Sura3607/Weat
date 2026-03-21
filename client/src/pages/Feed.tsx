@@ -7,10 +7,22 @@ import { trpc } from "@/lib/trpc";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
 import { Flame, MapPin } from "lucide-react";
+import { useState } from "react";
+import UserProfileSheet from "@/components/UserProfileSheet";
 
 export default function FeedPage() {
   const { user } = useAuth();
   const { data: logs, isLoading } = trpc.foodLog.feed.useQuery({ limit: 50, offset: 0 });
+
+  const [profileUserId, setProfileUserId] = useState<number | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const handleOpenProfile = (userId: number) => {
+    // Don't open profile sheet for own user
+    if (user && userId === user.id) return;
+    setProfileUserId(userId);
+    setProfileOpen(true);
+  };
 
   return (
     <div className="page-enter pb-24">
@@ -47,14 +59,24 @@ export default function FeedPage() {
           <Card key={log.id} className="overflow-hidden bg-card border-border/50 shadow-sm">
             {/* User info */}
             <div className="flex items-center gap-3 p-3 pb-0">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={log.userAvatar || undefined} />
-                <AvatarFallback className="bg-terracotta/20 text-terracotta text-xs">
-                  {(log.userName || "?")[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <button
+                onClick={() => handleOpenProfile(log.userId)}
+                className="shrink-0 cursor-pointer"
+              >
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={log.userAvatar || undefined} />
+                  <AvatarFallback className="bg-terracotta/20 text-terracotta text-xs">
+                    {(log.userName || "?")[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{log.userName || "Người dùng"}</p>
+                <button
+                  onClick={() => handleOpenProfile(log.userId)}
+                  className="text-sm font-medium truncate hover:underline cursor-pointer text-left"
+                >
+                  {log.userName || "Người dùng"}
+                </button>
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: vi })}
                 </p>
@@ -121,6 +143,13 @@ export default function FeedPage() {
           </Card>
         ))}
       </div>
+
+      {/* User Profile Sheet */}
+      <UserProfileSheet
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        userId={profileUserId}
+      />
     </div>
   );
 }

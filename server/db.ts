@@ -276,3 +276,48 @@ export async function updateMatchInviteStatus(id: number, status: "accepted" | "
   if (!db) return;
   await db.update(matchInvites).set({ status }).where(eq(matchInvites.id, id));
 }
+
+// ─── Public Profile ─────────────────────────────────────────────────
+
+export async function getPublicProfile(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select({
+    id: users.id,
+    name: users.name,
+    avatarUrl: users.avatarUrl,
+    bio: users.bio,
+    foodDna: users.foodDna,
+    currentCraving: users.currentCraving,
+    isRadarActive: users.isRadarActive,
+    createdAt: users.createdAt,
+  }).from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getFoodLogsByAnyUser(userId: number, limit = 20, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: foodLogs.id,
+    imageUrl: foodLogs.imageUrl,
+    dishName: foodLogs.dishName,
+    dishNameVi: foodLogs.dishNameVi,
+    category: foodLogs.category,
+    calories: foodLogs.calories,
+    tags: foodLogs.tags,
+    createdAt: foodLogs.createdAt,
+  }).from(foodLogs).where(eq(foodLogs.userId, userId)).orderBy(desc(foodLogs.createdAt)).limit(limit).offset(offset);
+}
+
+export async function checkFriendship(userId: number, otherUserId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select({ id: friendships.id }).from(friendships)
+    .where(and(
+      sql`((${friendships.userId} = ${userId} AND ${friendships.friendId} = ${otherUserId}) OR (${friendships.userId} = ${otherUserId} AND ${friendships.friendId} = ${userId}))`,
+      eq(friendships.status, "accepted"),
+    ))
+    .limit(1);
+  return result.length > 0;
+}

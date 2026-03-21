@@ -150,6 +150,26 @@ export const appRouter = router({
         await db.updateUserProfile(ctx.user.id, { avatarUrl: url });
         return { url };
       }),
+
+    getById: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const profile = await db.getPublicProfile(input.userId);
+        if (!profile) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+        }
+        const foodLogCount = await db.countFoodLogsByUser(input.userId);
+        const friendCount = await db.getFriendCount(input.userId);
+        const isFriend = await db.checkFriendship(ctx.user.id, input.userId);
+        const foodLogs = await db.getFoodLogsByAnyUser(input.userId, 20);
+        return {
+          ...profile,
+          foodLogCount,
+          friendCount,
+          isFriend,
+          foodLogs,
+        };
+      }),
   }),
 
     // ─── Legacy Client Aliases ───────────────────────────────────────
