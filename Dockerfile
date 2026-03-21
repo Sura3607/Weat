@@ -32,12 +32,9 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
 
-# Copy dependency files
-COPY package.json pnpm-lock.yaml ./
-COPY patches/ ./patches/
-
-# Install production dependencies only
-RUN pnpm install --prod --ignore-scripts
+# Reuse dependencies installed in builder to keep runtime in sync with build output
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built artifacts from builder
 COPY --from=builder /app/dist ./dist

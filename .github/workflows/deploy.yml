@@ -11,6 +11,10 @@ on:
       - "docker-compose.prod.yml"
       - "package.json"
       - "pnpm-lock.yaml"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "patches/**"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 jobs:
