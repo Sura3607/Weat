@@ -1,8 +1,16 @@
 node_modules
+.pnpm-store
 dist
 .git
 .gitignore
+.github
+.vscode
+.idea
+.manus
 .manus-logs
+coverage
+uploads
+*.log
 .env
 .env.*
 *.md
