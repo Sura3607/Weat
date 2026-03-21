@@ -1,9 +1,11 @@
 /**
- * Storage abstraction: AWS S3 direct → Manus Forge fallback
+ * Storage abstraction: AWS S3 direct → Manus Forge fallback → Local filesystem fallback
  */
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
+import fs from "fs";
+import path from "path";
 
 // ─── S3 Direct Mode ───────────────────────────────────────────────
 
@@ -43,6 +45,24 @@ function ensureTrailingSlash(value: string): string {
 
 function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
+}
+
+// ─── Local Filesystem Storage (development fallback) ─────────────
+
+const LOCAL_STORAGE_DIR = path.resolve(
+  import.meta.dirname || process.cwd(),
+  "..",
+  "..",
+  "uploads"
+);
+
+function ensureLocalStorageDir(key: string): string {
+  const fullPath = path.join(LOCAL_STORAGE_DIR, key);
+  const dir = path.dirname(fullPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return fullPath;
 }
 
 // ─── Public API ──────────────────────────────────────────────────
@@ -108,9 +128,15 @@ export async function storagePut(
     return { key, url: result.url };
   }
 
-  throw new Error(
-    "No storage configured. Set S3_BUCKET + S3_ACCESS_KEY + S3_SECRET_KEY, or BUILT_IN_FORGE_API_URL + BUILT_IN_FORGE_API_KEY."
-  );
+  // Final fallback: Local filesystem storage (for development)
+  console.log(`[Storage] Using local filesystem fallback: ${key}`);
+  const fullPath = ensureLocalStorageDir(key);
+  const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
+  fs.writeFileSync(fullPath, buffer);
+
+  // Return a URL that the server can serve via the /uploads static route
+  const url = `/uploads/${key}`;
+  return { key, url };
 }
 
 export async function storageGet(
@@ -143,5 +169,14 @@ export async function storageGet(
     return { key, url: result.url };
   }
 
-  throw new Error("No storage configured.");
+  // Local filesystem fallback
+  const url = `/uploads/${key}`;
+  return { key, url };
+}
+
+/**
+ * Get the local storage directory path (for Express static serving)
+ */
+export function getLocalStorageDir(): string {
+  return LOCAL_STORAGE_DIR;
 }

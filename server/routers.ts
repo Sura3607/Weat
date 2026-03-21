@@ -150,6 +150,26 @@ export const appRouter = router({
         await db.updateUserProfile(ctx.user.id, { avatarUrl: url });
         return { url };
       }),
+
+    getById: protectedProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const profile = await db.getPublicProfile(input.userId);
+        if (!profile) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+        }
+        const foodLogCount = await db.countFoodLogsByUser(input.userId);
+        const friendCount = await db.getFriendCount(input.userId);
+        const isFriend = await db.checkFriendship(ctx.user.id, input.userId);
+        const foodLogs = await db.getFoodLogsByAnyUser(input.userId, 20);
+        return {
+          ...profile,
+          foodLogCount,
+          friendCount,
+          isFriend,
+          foodLogs,
+        };
+      }),
   }),
 
     // ─── Legacy Client Aliases ───────────────────────────────────────
@@ -224,6 +244,67 @@ export const appRouter = router({
 
   // ─── Food Logs ───────────────────────────────────────────────────
   foodLog: router({
+    // Validate image before upload - check if it's food/drink
+    validateImage: protectedProcedure
+      .input(z.object({
+        imageBase64: z.string(),
+        mimeType: z.string().default("image/jpeg"),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a food/drink image classifier. Analyze the image and determine if it contains food or drinks.
+Return JSON with:
+- isFood: boolean (true if the image contains food, drinks, beverages, or anything edible/drinkable)
+- confidence: number between 0 and 1
+- reason: brief explanation in Vietnamese
+Be lenient - if there's any food or drink visible in the image, even partially, return isFood: true.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+                  { type: "text", text: "Is this image of food or drinks?" },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "food_validation",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    isFood: { type: "boolean" },
+                    confidence: { type: "number" },
+                    reason: { type: "string" },
+                  },
+                  required: ["isFood", "confidence", "reason"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = response.choices[0]?.message?.content;
+          if (typeof content === "string") {
+            const result = JSON.parse(content);
+            return { isFood: result.isFood, confidence: result.confidence, reason: result.reason };
+          }
+          // If parsing fails, allow upload (fail-open)
+          return { isFood: true, confidence: 0.5, reason: "Không thể xác định" };
+        } catch (err) {
+          console.error("[AI] Food validation failed:", err);
+          // Fail-open: allow upload if validation fails
+          return { isFood: true, confidence: 0, reason: "Lỗi hệ thống, cho phép upload" };
+        }
+      }),
+
     create: protectedProcedure
       .input(z.object({
         imageBase64: z.string(),
@@ -234,13 +315,62 @@ export const appRouter = router({
         locationName: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // 0. AI Vision Validation - Check if image is food/drink
+        try {
+          const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
+          const validationResponse = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: `You are a food/drink image classifier. Return JSON: { "isFood": boolean }. Return true if the image contains any food, drinks, beverages, or edible items. Be lenient.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "image_url", image_url: { url: dataUrl, detail: "low" } },
+                  { type: "text", text: "Is this food or drink?" },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "food_check",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: { isFood: { type: "boolean" } },
+                  required: ["isFood"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const checkContent = validationResponse.choices[0]?.message?.content;
+          if (typeof checkContent === "string") {
+            const checkResult = JSON.parse(checkContent);
+            if (!checkResult.isFood) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Ch\u1EC9 \u0111\u01B0\u1EE3c ph\u00E9p \u0111\u0103ng \u1EA3nh \u0111\u1ED3 \u0103n/n\u01B0\u1EDBc u\u1ED1ng!",
+              });
+            }
+          }
+        } catch (err) {
+          // Re-throw TRPCError (our validation error)
+          if (err instanceof TRPCError) throw err;
+          // Otherwise fail-open: allow upload if AI validation itself fails
+          console.error("[AI] Food validation in create failed:", err);
+        }
+
         // 1. Upload image to S3
         const buffer = Buffer.from(input.imageBase64, "base64");
         const ext = input.mimeType.split("/")[1] || "jpg";
         const key = `food/${ctx.user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { url: imageUrl } = await storagePut(key, buffer, input.mimeType);
 
-        // 2. AI analysis
+        // 2. AI analysis (use base64 data URL so LLM can always access the image)
+        const analysisDataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
         let aiResult: Record<string, unknown> = {};
         try {
           const systemPrompt = `You are a food analysis AI. Analyze the food image and return JSON with these fields:
@@ -259,7 +389,7 @@ Return ONLY valid JSON, no markdown.`;
               {
                 role: "user",
                 content: [
-                  { type: "image_url", image_url: { url: imageUrl, detail: "low" } },
+                  { type: "image_url", image_url: { url: analysisDataUrl, detail: "low" } },
                   { type: "text", text: "Analyze this food image." },
                 ],
               },
@@ -336,6 +466,16 @@ Return ONLY valid JSON, no markdown.`;
       .query(async ({ ctx, input }) => {
         const { limit = 50, offset = 0 } = input || {};
         return db.getFoodLogsByUser(ctx.user.id, limit, offset);
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ logId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const deleted = await db.deleteFoodLog(input.logId, ctx.user.id);
+        if (!deleted) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Post not found or not yours" });
+        }
+        return { success: true };
       }),
   }),
 
@@ -502,6 +642,78 @@ Return ONLY valid JSON, no markdown.`;
           rating: p.rating,
           totalRatings: p.user_ratings_total,
         }));
+      }),
+  }),
+
+  // ─── Chat ────────────────────────────────────────────────────────
+  chat: router({
+    send: protectedProcedure
+      .input(z.object({
+        receiverId: z.number(),
+        content: z.string().min(1).max(2000),
+        matchInviteId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const msgId = await db.createChatMessage({
+          senderId: ctx.user.id,
+          receiverId: input.receiverId,
+          content: input.content,
+          matchInviteId: input.matchInviteId || null,
+        });
+
+        // Send real-time notification via WebSocket
+        sendToUser(input.receiverId, {
+          type: "chat_message",
+          messageId: msgId,
+          senderId: ctx.user.id,
+          senderName: ctx.user.name,
+          senderAvatar: ctx.user.avatarUrl,
+          content: input.content,
+        });
+
+        return { messageId: msgId };
+      }),
+
+    messages: protectedProcedure
+      .input(z.object({
+        otherUserId: z.number(),
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        // Mark messages as read
+        await db.markMessagesAsRead(ctx.user.id, input.otherUserId);
+        return db.getChatMessages(ctx.user.id, input.otherUserId, input.limit, input.offset);
+      }),
+  }),
+
+  // ─── Reactions ───────────────────────────────────────────────────
+  reaction: router({
+    add: protectedProcedure
+      .input(z.object({
+        foodLogId: z.number(),
+        emoji: z.string().min(1).max(32),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const id = await db.addPostReaction({
+          foodLogId: input.foodLogId,
+          userId: ctx.user.id,
+          emoji: input.emoji,
+        });
+        return { id };
+      }),
+
+    remove: protectedProcedure
+      .input(z.object({ foodLogId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await db.removePostReaction(input.foodLogId, ctx.user.id);
+        return { success: true };
+      }),
+
+    getForPost: protectedProcedure
+      .input(z.object({ foodLogId: z.number() }))
+      .query(async ({ input }) => {
+        return db.getPostReactions(input.foodLogId);
       }),
   }),
 

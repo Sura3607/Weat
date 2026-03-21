@@ -1,5 +1,6 @@
 import { Camera, MapPin, Radio, User, Utensils } from "lucide-react";
 import { useLocation, Link } from "wouter";
+import { trpc } from "@/lib/trpc";
 
 const navItems = [
   { path: "/feed", icon: Utensils, label: "Feed" },
@@ -10,10 +11,32 @@ const navItems = [
 ];
 
 export default function BottomNav() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const utils = trpc.useUtils();
 
   // Hide on camera page and home page (before login)
   if (location === "/camera" || location === "/") return null;
+
+  const handleNavClick = (path: string) => {
+    // If already on this page, trigger a data refresh
+    if (location === path) {
+      switch (path) {
+        case "/feed":
+          utils.foodLog.feed.invalidate();
+          break;
+        case "/radar":
+          utils.radar.nearby.invalidate();
+          break;
+        case "/profile":
+          utils.profile.get.invalidate();
+          utils.foodLog.myLogs.invalidate();
+          break;
+        case "/venues":
+          utils.venue.search.invalidate();
+          break;
+      }
+    }
+  };
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-card/95 backdrop-blur-md border-t border-border bottom-nav z-50">
@@ -24,7 +47,7 @@ export default function BottomNav() {
 
           if (item.isCenter) {
             return (
-              <Link key={item.path} href={item.path}>
+              <Link key={item.path} href={item.path} onClick={() => handleNavClick(item.path)}>
                 <div className="flex flex-col items-center -mt-5">
                   <div className="w-14 h-14 rounded-full bg-terracotta shadow-lg flex items-center justify-center">
                     <Icon className="w-6 h-6 text-white" />
@@ -36,7 +59,7 @@ export default function BottomNav() {
           }
 
           return (
-            <Link key={item.path} href={item.path}>
+            <Link key={item.path} href={item.path} onClick={() => handleNavClick(item.path)}>
               <div className="flex flex-col items-center py-2 px-3">
                 <Icon
                   className={`w-5 h-5 transition-colors ${

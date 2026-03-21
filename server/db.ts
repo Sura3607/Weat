@@ -6,6 +6,8 @@ import {
   InsertCheckIn, checkIns,
   InsertFriendship, friendships,
   InsertMatchInvite, matchInvites,
+  InsertChatMessage, chatMessages,
+  InsertPostReaction, postReactions,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -275,4 +277,192 @@ export async function updateMatchInviteStatus(id: number, status: "accepted" | "
   const db = await getDb();
   if (!db) return;
   await db.update(matchInvites).set({ status }).where(eq(matchInvites.id, id));
+}
+
+// ─── Public Profile ─────────────────────────────────────────────────
+
+export async function getPublicProfile(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select({
+    id: users.id,
+    name: users.name,
+    avatarUrl: users.avatarUrl,
+    bio: users.bio,
+    foodDna: users.foodDna,
+    currentCraving: users.currentCraving,
+    isRadarActive: users.isRadarActive,
+    createdAt: users.createdAt,
+  }).from(users).where(eq(users.id, userId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getFoodLogsByAnyUser(userId: number, limit = 20, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: foodLogs.id,
+    imageUrl: foodLogs.imageUrl,
+    dishName: foodLogs.dishName,
+    dishNameVi: foodLogs.dishNameVi,
+    category: foodLogs.category,
+    calories: foodLogs.calories,
+    tags: foodLogs.tags,
+    createdAt: foodLogs.createdAt,
+  }).from(foodLogs).where(eq(foodLogs.userId, userId)).orderBy(desc(foodLogs.createdAt)).limit(limit).offset(offset);
+}
+
+export async function checkFriendship(userId: number, otherUserId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select({ id: friendships.id }).from(friendships)
+    .where(and(
+      sql`((${friendships.userId} = ${userId} AND ${friendships.friendId} = ${otherUserId}) OR (${friendships.userId} = ${otherUserId} AND ${friendships.friendId} = ${userId}))`,
+      eq(friendships.status, "accepted"),
+    ))
+    .limit(1);
+  return result.length > 0;
+}
+
+export async function getFriendsList(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const result = await db.select({
+    id: users.id,
+    name: users.name,
+    avatarUrl: users.avatarUrl,
+    currentCraving: users.currentCraving,
+    isRadarActive: users.isRadarActive,
+  }).from(friendships)
+    .innerJoin(users, sql`
+      CASE
+        WHEN ${friendships.userId} = ${userId} THEN ${friendships.friendId} = ${users.id}
+        ELSE ${friendships.userId} = ${users.id}
+      END
+    `)
+    .where(and(
+      sql`(${friendships.userId} = ${userId} OR ${friendships.friendId} = ${userId})`,
+      eq(friendships.status, "accepted"),
+      ne(users.id, userId),
+    ));
+  return result;
+}
+
+// ─── Chat Messages ─────────────────────────────────────────────────
+
+export async function createChatMessage(data: InsertChatMessage) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(chatMessages).values(data);
+  return result[0].insertId;
+}
+
+export async function getChatMessages(userId: number, otherUserId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: chatMessages.id,
+    senderId: chatMessages.senderId,
+    receiverId: chatMessages.receiverId,
+    content: chatMessages.content,
+    isRead: chatMessages.isRead,
+    createdAt: chatMessages.createdAt,
+    senderName: users.name,
+    senderAvatar: users.avatarUrl,
+  })
+    .from(chatMessages)
+    .leftJoin(users, eq(chatMessages.senderId, users.id))
+    .where(
+      sql`((${chatMessages.senderId} = ${userId} AND ${chatMessages.receiverId} = ${otherUserId}) OR (${chatMessages.senderId} = ${otherUserId} AND ${chatMessages.receiverId} = ${userId}))`
+    )
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function markMessagesAsRead(userId: number, senderId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(chatMessages)
+    .set({ isRead: true })
+    .where(and(
+      eq(chatMessages.receiverId, userId),
+      eq(chatMessages.senderId, senderId),
+      eq(chatMessages.isRead, false),
+    ));
+}
+
+// ─── Post Reactions ────────────────────────────────────────────────
+
+export async function addPostReaction(data: InsertPostReaction) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Remove existing reaction from same user on same post, then add new one
+  await db.delete(postReactions).where(and(
+    eq(postReactions.foodLogId, data.foodLogId),
+    eq(postReactions.userId, data.userId),
+  ));
+  const result = await db.insert(postReactions).values(data);
+  return result[0].insertId;
+}
+
+export async function removePostReaction(foodLogId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(postReactions).where(and(
+    eq(postReactions.foodLogId, foodLogId),
+    eq(postReactions.userId, userId),
+  ));
+}
+
+export async function getPostReactions(foodLogId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: postReactions.id,
+    userId: postReactions.userId,
+    emoji: postReactions.emoji,
+    userName: users.name,
+    userAvatar: users.avatarUrl,
+    createdAt: postReactions.createdAt,
+  })
+    .from(postReactions)
+    .leftJoin(users, eq(postReactions.userId, users.id))
+    .where(eq(postReactions.foodLogId, foodLogId))
+    .orderBy(desc(postReactions.createdAt));
+}
+
+export async function getReactionsForFeed(foodLogIds: number[]) {
+  const db = await getDb();
+  if (!db) return [];
+  if (foodLogIds.length === 0) return [];
+  return db.select({
+    id: postReactions.id,
+    foodLogId: postReactions.foodLogId,
+    userId: postReactions.userId,
+    emoji: postReactions.emoji,
+    userName: users.name,
+  })
+    .from(postReactions)
+    .leftJoin(users, eq(postReactions.userId, users.id))
+    .where(sql`${postReactions.foodLogId} IN (${sql.join(foodLogIds.map(id => sql`${id}`), sql`, `)})`);
+}
+
+// ─── Food Log Deletion ─────────────────────────────────────────────
+
+export async function deleteFoodLog(logId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.delete(foodLogs).where(and(
+    eq(foodLogs.id, logId),
+    eq(foodLogs.userId, userId),
+  ));
+  return (result[0] as any).affectedRows > 0;
+}
+
+export async function getFoodLogById(logId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(foodLogs).where(eq(foodLogs.id, logId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }

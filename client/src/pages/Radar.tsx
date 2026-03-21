@@ -3,12 +3,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { trpc } from "@/lib/trpc";
-import { Loader2, MapPin, Radio, Send, Utensils } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Loader2, MapPin, MessageCircle, Radio, Send, UserCheck, Utensils } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import UserProfileSheet from "@/components/UserProfileSheet";
+import ChatSheet from "@/components/ChatSheet";
+import CravingDialog from "@/components/CravingDialog";
 
 export default function RadarPage() {
   const { user, loading: authLoading } = useAuth({ redirectOnUnauthenticated: true });
@@ -19,7 +21,19 @@ export default function RadarPage() {
   const sendInvite = trpc.match.sendInvite.useMutation();
 
   const [isActive, setIsActive] = useState<boolean>(false);
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
+
+  // Profile sheet state
+  const [profileUserId, setProfileUserId] = useState<number | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  // Chat sheet state
+  const [chatUserId, setChatUserId] = useState<number | null>(null);
+  const [chatUserName, setChatUserName] = useState<string | null>(null);
+  const [chatUserAvatar, setChatUserAvatar] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Craving dialog state
+  const [cravingOpen, setCravingOpen] = useState(false);
 
   const locationReady = latitude !== null && longitude !== null;
 
@@ -47,6 +61,10 @@ export default function RadarPage() {
     if (newState) {
       requestLocation();
       toast.success("Radar đã bật - đang tìm người gần bạn");
+      // Prompt to set craving if not set
+      if (!user?.currentCraving) {
+        setCravingOpen(true);
+      }
     } else {
       toast.info("Radar đã tắt");
     }
@@ -56,10 +74,22 @@ export default function RadarPage() {
     try {
       await sendInvite.mutateAsync({ receiverId, craving: user?.currentCraving || undefined });
       toast.success("Đã gửi lời mời ăn cùng!");
-      setSelectedUser(null);
     } catch {
       toast.error("Không thể gửi lời mời");
     }
+  };
+
+  // For friends: skip match, open chat directly
+  const handleInviteFriend = (userId: number, userName: string | null, userAvatar: string | null) => {
+    setChatUserId(userId);
+    setChatUserName(userName);
+    setChatUserAvatar(userAvatar);
+    setChatOpen(true);
+  };
+
+  const handleOpenProfile = (userId: number) => {
+    setProfileUserId(userId);
+    setProfileOpen(true);
   };
 
   if (authLoading) {
@@ -79,15 +109,26 @@ export default function RadarPage() {
             <h1 className="text-xl font-bold text-foreground">Radar</h1>
             <p className="text-xs text-muted-foreground">Tìm bạn ăn gần bạn</p>
           </div>
-          <Button
-            size="sm"
-            variant={isActive ? "default" : "outline"}
-            className={isActive ? "bg-terracotta hover:bg-terracotta-dark" : ""}
-            onClick={handleToggleRadar}
-          >
-            <Radio className="w-4 h-4 mr-1" />
-            {isActive ? "Đang bật" : "Bật radar"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-ochre border-ochre/30"
+              onClick={() => setCravingOpen(true)}
+            >
+              <Utensils className="w-3.5 h-3.5 mr-1" />
+              {user?.currentCraving || "Thèm gì?"}
+            </Button>
+            <Button
+              size="sm"
+              variant={isActive ? "default" : "outline"}
+              className={isActive ? "bg-terracotta hover:bg-terracotta-dark" : ""}
+              onClick={handleToggleRadar}
+            >
+              <Radio className="w-4 h-4 mr-1" />
+              {isActive ? "Đang bật" : "Bật radar"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -119,7 +160,7 @@ export default function RadarPage() {
                 key={u.id}
                 className="absolute z-20 transform -translate-x-1/2 -translate-y-1/2 transition-all"
                 style={{ left: `${x}%`, top: `${y}%` }}
-                onClick={() => setSelectedUser(u.id)}
+                onClick={() => handleOpenProfile(u.id)}
               >
                 <Avatar className="w-8 h-8 border-2 border-white shadow-md">
                   <AvatarImage src={u.avatarUrl || undefined} />
@@ -160,43 +201,21 @@ export default function RadarPage() {
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               {nearbyUsers.length} người gần bạn
             </h2>
-            {nearbyUsers.map((u) => (
-              <Card key={u.id} className="p-3">
-                <div className="flex items-center gap-3">
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={u.avatarUrl || undefined} />
-                    <AvatarFallback className="bg-terracotta/20 text-terracotta">
-                      {(u.name || "?")[0]?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{u.name || "Người dùng"}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {Math.round(u.distance * 1000)}m
-                      </span>
-                      {u.foodDnaCompatibility > 0 && (
-                        <Badge variant="secondary" className="text-[10px] bg-sage-light text-sage-dark border-0">
-                          {u.foodDnaCompatibility}% match
-                        </Badge>
-                      )}
-                    </div>
-                    {u.currentCraving && (
-                      <p className="text-xs text-ochre mt-0.5">Đang thèm: {u.currentCraving}</p>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    className="bg-terracotta hover:bg-terracotta-dark text-white"
-                    onClick={() => handleSendInvite(u.id)}
-                    disabled={sendInvite.isPending}
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+            {nearbyUsers.map((u) => {
+              // Check if this user is a friend (we use foodDnaCompatibility > 0 as proxy,
+              // but ideally we'd have isFriend from backend. We'll use profile.getById for that)
+              return (
+                <NearbyUserCard
+                  key={u.id}
+                  user={u}
+                  currentUserId={user?.id || 0}
+                  onOpenProfile={() => handleOpenProfile(u.id)}
+                  onSendInvite={() => handleSendInvite(u.id)}
+                  onInviteFriend={() => handleInviteFriend(u.id, u.name, u.avatarUrl)}
+                  sendInvitePending={sendInvite.isPending}
+                />
+              );
+            })}
           </div>
         )}
 
@@ -207,6 +226,116 @@ export default function RadarPage() {
           </div>
         )}
       </div>
+
+      {/* Craving Dialog */}
+      <CravingDialog open={cravingOpen} onOpenChange={setCravingOpen} />
+
+      {/* User Profile Sheet */}
+      <UserProfileSheet
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        userId={profileUserId}
+      />
+
+      {/* Chat Sheet */}
+      <ChatSheet
+        open={chatOpen}
+        onOpenChange={setChatOpen}
+        otherUserId={chatUserId}
+        otherUserName={chatUserName}
+        otherUserAvatar={chatUserAvatar}
+      />
     </div>
+  );
+}
+
+// Sub-component for nearby user card with friend detection
+function NearbyUserCard({
+  user: u,
+  currentUserId,
+  onOpenProfile,
+  onSendInvite,
+  onInviteFriend,
+  sendInvitePending,
+}: {
+  user: any;
+  currentUserId: number;
+  onOpenProfile: () => void;
+  onSendInvite: () => void;
+  onInviteFriend: () => void;
+  sendInvitePending: boolean;
+}) {
+  // Check friendship status
+  const { data: profileData } = trpc.profile.getById.useQuery(
+    { userId: u.id },
+    { enabled: true, staleTime: 60000 }
+  );
+
+  const isFriend = profileData?.isFriend ?? false;
+
+  return (
+    <Card className="p-3">
+      <div className="flex items-center gap-3">
+        <button onClick={onOpenProfile} className="shrink-0 cursor-pointer">
+          <Avatar className="w-10 h-10">
+            <AvatarImage src={u.avatarUrl || undefined} />
+            <AvatarFallback className="bg-terracotta/20 text-terracotta">
+              {(u.name || "?")[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={onOpenProfile}
+              className="font-medium text-sm truncate hover:underline cursor-pointer text-left"
+            >
+              {u.name || "Người dùng"}
+            </button>
+            {isFriend && (
+              <Badge className="bg-sage/20 text-sage border-0 text-[10px] px-1.5 py-0">
+                <UserCheck className="w-2.5 h-2.5 mr-0.5" />
+                Bạn bè
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {Math.round(u.distance * 1000)}m
+            </span>
+            {u.foodDnaCompatibility > 0 && (
+              <Badge variant="secondary" className="text-[10px] bg-sage-light text-sage-dark border-0">
+                {u.foodDnaCompatibility}% match
+              </Badge>
+            )}
+          </div>
+          {u.currentCraving && (
+            <p className="text-xs text-ochre mt-0.5">Đang thèm: {u.currentCraving}</p>
+          )}
+        </div>
+
+        {/* Action button: "Rủ" for friends (opens chat), "Send invite" for strangers */}
+        {isFriend ? (
+          <Button
+            size="sm"
+            className="bg-sage hover:bg-sage/80 text-white"
+            onClick={onInviteFriend}
+          >
+            <MessageCircle className="w-3.5 h-3.5 mr-1" />
+            Rủ
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="bg-terracotta hover:bg-terracotta-dark text-white"
+            onClick={onSendInvite}
+            disabled={sendInvitePending}
+          >
+            <Send className="w-3.5 h-3.5" />
+          </Button>
+        )}
+      </div>
+    </Card>
   );
 }

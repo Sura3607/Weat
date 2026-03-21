@@ -96,8 +96,11 @@ export async function transcribeAudio(
     let apiKey: string;
 
     if (ENV.openaiApiKey) {
-      // Direct OpenAI
-      apiUrl = "https://api.openai.com/v1/audio/transcriptions";
+      // OpenAI (direct or via proxy)
+      const baseUrl = process.env.OPENAI_BASE_URL
+        || process.env.OPENAI_API_BASE
+        || "https://api.openai.com/v1";
+      apiUrl = baseUrl.replace(/\/+$/, "") + "/audio/transcriptions";
       apiKey = ENV.openaiApiKey;
     } else if (ENV.forgeApiKey && ENV.forgeApiUrl) {
       // Manus Forge fallback

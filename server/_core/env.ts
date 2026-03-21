@@ -12,7 +12,7 @@ export const ENV = {
 
   // ─── OpenAI (LLM + Whisper) ────────────────────────────────────
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
-  openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+  openaiModel: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
 
   // ─── AWS S3 Storage ─────────────────────────────────────────────
   s3Bucket: process.env.S3_BUCKET ?? "",
