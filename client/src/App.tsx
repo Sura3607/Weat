@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import BottomNav from "./components/BottomNav";
 import NotificationHandler from "./components/NotificationHandler";
 import OnboardingFlow from "./components/OnboardingFlow";
+import Onboarding from "./pages/Onboarding";
 import Home from "./pages/Home";
 import Feed from "./pages/Feed";
 import Camera from "./pages/Camera";
@@ -23,6 +24,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/feed" component={Feed} />
+      <Route path="/onboarding" component={Onboarding} />
       <Route path="/camera" component={Camera} />
       <Route path="/radar" component={Radar} />
       <Route path="/venues" component={Venues} />
@@ -39,11 +41,11 @@ function AppContent({ onboardingComplete, setOnboardingComplete }: { onboardingC
   const [location] = useLocation();
   const { isAuthenticated, loading: authLoading } = useAuth();
   
-  // Allow direct access to login/register pages without onboarding
+  // Pages where bottom nav should be hidden
   const isAuthPage = location === "/login" || location === "/register";
-  
-  // Show onboarding only if not complete AND not authenticated AND not on auth page
-  const showOnboarding = !onboardingComplete && !isAuthenticated && !isAuthPage && !authLoading;
+  const isOnboardingPage = location === "/onboarding";
+  const isHomePage = location === "/";
+  const hideBottomNav = isAuthPage || isOnboardingPage || isHomePage;
   
   if (authLoading) {
     return (
@@ -53,7 +55,8 @@ function AppContent({ onboardingComplete, setOnboardingComplete }: { onboardingC
     );
   }
   
-  if (showOnboarding) {
+  // If user is authenticated and onboarding is not complete, redirect to onboarding
+  if (isAuthenticated && !onboardingComplete && !isOnboardingPage) {
     return <OnboardingFlow onComplete={() => setOnboardingComplete(true)} />;
   }
 
@@ -65,7 +68,7 @@ function AppContent({ onboardingComplete, setOnboardingComplete }: { onboardingC
           <NotificationHandler />
           <div className="app-shell">
             <Router />
-            <BottomNav />
+            {!hideBottomNav && <BottomNav />}
           </div>
         </TooltipProvider>
       </ThemeProvider>

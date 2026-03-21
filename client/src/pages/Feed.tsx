@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -22,17 +21,94 @@ import {
 import { trpc } from "@/lib/trpc";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
-import { Flame, MapPin, MessageCircle, SmilePlus, Trash2, MoreHorizontal } from "lucide-react";
-import { useState, useCallback } from "react";
+import { Flame, MapPin, MessageCircle, SmilePlus, Trash2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
 import UserProfileSheet from "@/components/UserProfileSheet";
 import ChatSheet from "@/components/ChatSheet";
 import { toast } from "sonner";
 
-const EMOJI_LIST = ["😋", "🤤", "😍", "🔥", "👍", "❤️", "😮", "🥰"];
+// 3 reactions: ngon, binh thuong, do
+const EMOJI_LIST = [
+  { emoji: "😋", label: "Ngon" },
+  { emoji: "😐", label: "Bình thường" },
+  { emoji: "🤢", label: "Dở" }
+];
+
+interface Reaction {
+  id: number;
+  userId: number;
+  emoji: string;
+  userName: string | null;
+  userAvatar: string | null;
+}
+
+interface FoodLog {
+  id: number;
+  userId: number;
+  userName: string | null;
+  userAvatar: string | null;
+  imageUrl: string;
+  dishName: string | null;
+  dishNameVi: string | null;
+  locationName: string | null;
+  calories: number | null;
+  tags: string[] | null;
+  voiceNote: string | null;
+  createdAt: Date;
+}
+
+// Mock data for feed when no real data is available
+const MOCK_LOGS: FoodLog[] = [
+  {
+    id: 101,
+    userId: 201,
+    userName: "Minh Anh",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&h=600&fit=crop",
+    dishName: "Curry",
+    dishNameVi: "Cà ri",
+    locationName: "Tokyo, Japan",
+    calories: 450,
+    tags: ["spicy", "japanese", "rice"],
+    voiceNote: "Thơm ngon, cay vừa phải!",
+    createdAt: new Date(Date.now() - 1000 * 60 * 30),
+  },
+  {
+    id: 102,
+    userId: 202,
+    userName: "Hoàng Nam",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&h=600&fit=crop",
+    dishName: "Phở",
+    dishNameVi: "Phở bò",
+    locationName: "Hà Nội, Việt Nam",
+    calories: 380,
+    tags: ["vietnamese", "noodles", "soup"],
+    voiceNote: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
+  },
+  {
+    id: 103,
+    userId: 203,
+    userName: "Lan Phương",
+    userAvatar: null,
+    imageUrl: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&h=600&fit=crop",
+    dishName: "Pizza",
+    dishNameVi: "Pizza Margherita",
+    locationName: "Hồ Chí Minh, Việt Nam",
+    calories: 620,
+    tags: ["italian", "pizza", "cheese"],
+    voiceNote: "Pizza nóng hổi vừa thổi vừa ăn!",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5),
+  },
+];
 
 export default function FeedPage() {
   const { user } = useAuth();
   const { data: logs, isLoading, refetch } = trpc.foodLog.feed.useQuery({ limit: 50, offset: 0 });
+
+  // Use mock data if no real data is available
+  const displayLogs = logs && logs.length > 0 ? logs : MOCK_LOGS;
 
   // Profile sheet state
   const [profileUserId, setProfileUserId] = useState<number | null>(null);
@@ -49,11 +125,32 @@ export default function FeedPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Reactions state: track reactions per post
-  const [postReactions, setPostReactions] = useState<Record<number, { emoji: string; userName: string | null }[]>>({});
+  const [postReactions, setPostReactions] = useState<Record<number, Reaction[]>>({});
+
+  const utils = trpc.useUtils();
 
   const addReaction = trpc.reaction.add.useMutation({
-    onSuccess: () => {
-      toast.success("Đã thả reaction!");
+    onSuccess: (_, variables) => {
+      // Optimistic update: add reaction to local state immediately
+      setPostReactions((prev) => {
+        const currentReactions = prev[variables.foodLogId] || [];
+        // Remove existing reaction from this user if any
+        const filteredReactions = currentReactions.filter((r) => r.userId !== user?.id);
+        // Add new reaction
+        const newReaction: Reaction = {
+          id: Date.now(), // temporary id
+          userId: user!.id,
+          emoji: variables.emoji,
+          userName: user?.name || null,
+          userAvatar: user?.avatarUrl || null,
+        };
+        return {
+          ...prev,
+          [variables.foodLogId]: [...filteredReactions, newReaction],
+        };
+      });
+      // Invalidate to refetch from server in background
+      utils.reaction.getForPost.invalidate({ foodLogId: variables.foodLogId });
     },
   });
 
@@ -67,6 +164,28 @@ export default function FeedPage() {
       toast.error("Không thể xóa bài đăng");
     },
   });
+
+  // Load reactions for each post when logs change
+  useEffect(() => {
+    const logsToUse = logs && logs.length > 0 ? logs : MOCK_LOGS;
+    if (!logsToUse.length) return;
+    
+    const loadReactions = async () => {
+      const reactionsMap: Record<number, Reaction[]> = {};
+      for (const log of logsToUse) {
+        try {
+          const reactions = await utils.reaction.getForPost.fetch({ foodLogId: log.id });
+          reactionsMap[log.id] = reactions;
+        } catch (error) {
+          console.error(`Failed to load reactions for post ${log.id}:`, error);
+          reactionsMap[log.id] = [];
+        }
+      }
+      setPostReactions(reactionsMap);
+    };
+    
+    loadReactions();
+  }, [logs, utils]);
 
   const handleOpenProfile = (userId: number) => {
     if (user && userId === user.id) return;
@@ -84,14 +203,7 @@ export default function FeedPage() {
 
   const handleReaction = useCallback((logId: number, emoji: string) => {
     addReaction.mutate({ foodLogId: logId, emoji });
-    // Optimistic update
-    setPostReactions((prev) => {
-      const existing = prev[logId] || [];
-      // Remove existing reaction from same user, add new
-      const filtered = existing.filter((r) => r.userName !== (user?.name || null));
-      return { ...prev, [logId]: [...filtered, { emoji, userName: user?.name || null }] };
-    });
-  }, [addReaction, user]);
+  }, [addReaction]);
 
   const handleDeletePost = (logId: number) => {
     setDeleteLogId(logId);
@@ -105,19 +217,19 @@ export default function FeedPage() {
   };
 
   return (
-    <div className="page-enter pb-24">
+    <div className="page-enter pb-32 max-w-md mx-auto bg-[#FAF8F5] min-h-screen">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3">
-        <h1 className="text-xl font-bold text-foreground">Feed</h1>
-        <p className="text-xs text-muted-foreground">Khám phá món ăn từ mọi người</p>
+      <div className="sticky top-0 z-40 bg-[#FAF8F5]/80 backdrop-blur-md border-b border-orange-900/10 shadow-sm px-5 py-4">
+        <h1 className="text-2xl font-bold text-[#D9774A]">Feed</h1>
+        <p className="text-sm text-stone-500 mt-1">Khám phá món ăn từ mọi người</p>
       </div>
 
       {/* Feed list */}
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-6">
         {isLoading && (
           <>
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="overflow-hidden">
+              <Card key={i} className="overflow-hidden rounded-3xl shadow-sm">
                 <Skeleton className="w-full aspect-square" />
                 <div className="p-4 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
@@ -128,28 +240,28 @@ export default function FeedPage() {
           </>
         )}
 
-        {logs && logs.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground text-lg">Chưa có food log nào</p>
-            <p className="text-muted-foreground text-sm mt-1">Hãy chụp ảnh món ăn đầu tiên!</p>
-          </div>
-        )}
-
-        {logs?.map((log) => {
+        {displayLogs.map((log) => {
           const isOwner = user && log.userId === user.id;
           const reactions = postReactions[log.id] || [];
 
+          // Group reactions by emoji and count
+          const reactionCounts: Record<string, number> = {};
+          reactions.forEach((r) => {
+            reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+          });
+          const groupedReactions = Object.entries(reactionCounts);
+
           return (
-            <Card key={log.id} className="overflow-hidden bg-card border-border/50 shadow-sm">
+            <Card key={log.id} className="overflow-hidden bg-white border-gray-100 shadow-md rounded-3xl">
               {/* User info header */}
-              <div className="flex items-center gap-3 p-3 pb-0">
+              <div className="flex items-center gap-3 p-4 pb-2">
                 <button
                   onClick={() => handleOpenProfile(log.userId)}
                   className="shrink-0 cursor-pointer"
                 >
-                  <Avatar className="w-8 h-8">
+                  <Avatar className="w-10 h-10 ring-2 ring-gray-100">
                     <AvatarImage src={log.userAvatar || undefined} />
-                    <AvatarFallback className="bg-terracotta/20 text-terracotta text-xs">
+                    <AvatarFallback className="bg-terracotta/10 text-terracotta text-sm font-semibold">
                       {(log.userName || "?")[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -157,17 +269,17 @@ export default function FeedPage() {
                 <div className="flex-1 min-w-0">
                   <button
                     onClick={() => handleOpenProfile(log.userId)}
-                    className="text-sm font-medium truncate hover:underline cursor-pointer text-left"
+                    className="text-sm font-semibold text-gray-900 truncate hover:underline cursor-pointer text-left"
                   >
                     {log.userName || "Người dùng"}
                   </button>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-500">
                     {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true, locale: vi })}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
                   {log.calories && (
-                    <div className="flex items-center gap-1 text-xs text-ochre font-medium mr-1">
+                    <div className="flex items-center gap-1 text-xs text-orange-600 font-semibold bg-orange-50 px-2 py-1 rounded-full">
                       <Flame className="w-3.5 h-3.5" />
                       {log.calories} cal
                     </div>
@@ -176,16 +288,16 @@ export default function FeedPage() {
                   {isOwner && (
                     <button
                       onClick={() => handleDeletePost(log.id)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Food image */}
-              <div className="mt-2">
+              <div className="mt-1">
                 <img
                   src={log.imageUrl}
                   alt={log.dishName || "Food"}
@@ -195,24 +307,25 @@ export default function FeedPage() {
               </div>
 
               {/* Action buttons row */}
-              <div className="flex items-center gap-1 px-3 pt-2">
+              <div className="flex items-center gap-2 px-4 pt-3 pb-2">
                 {/* Reaction button */}
                 <Popover>
                   <PopoverTrigger asChild>
-                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-                      <SmilePlus className="w-4 h-4" />
-                      <span className="text-xs">React</span>
+                    <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors text-gray-600 hover:text-gray-900">
+                      <SmilePlus className="w-5 h-5" />
+                      <span className="text-sm font-medium">React</span>
                     </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-2" side="top" align="start">
                     <div className="flex gap-1">
-                      {EMOJI_LIST.map((emoji) => (
+                      {EMOJI_LIST.map((item) => (
                         <button
-                          key={emoji}
-                          onClick={() => handleReaction(log.id, emoji)}
-                          className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-lg transition-transform hover:scale-125"
+                          key={item.emoji}
+                          onClick={() => handleReaction(log.id, item.emoji)}
+                          className="w-11 h-11 rounded-xl hover:bg-gray-100 flex items-center justify-center text-2xl transition-transform hover:scale-125"
+                          title={item.label}
                         >
-                          {emoji}
+                          {item.emoji}
                         </button>
                       ))}
                     </div>
@@ -223,24 +336,25 @@ export default function FeedPage() {
                 {!isOwner && (
                   <button
                     onClick={() => handleOpenChat(log.userId, log.userName, log.userAvatar)}
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors text-gray-600 hover:text-gray-900"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="text-xs">Nhắn tin</span>
+                    <MessageCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">Nhắn tin</span>
                   </button>
                 )}
               </div>
 
               {/* Reactions display */}
-              {reactions.length > 0 && (
-                <div className="px-3 pb-1">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {reactions.map((r, i) => (
-                      <span key={i} className="text-sm" title={r.userName || undefined}>
-                        {r.emoji}
-                      </span>
+              {groupedReactions.length > 0 && (
+                <div className="px-4 pb-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {groupedReactions.map(([emoji, count]) => (
+                      <div key={emoji} className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg">
+                        <span className="text-base">{emoji}</span>
+                        {count > 1 && <span className="text-xs text-gray-600 font-medium">{count}</span>}
+                      </div>
                     ))}
-                    <span className="text-xs text-muted-foreground ml-1">
+                    <span className="text-xs text-gray-500 ml-1">
                       {reactions.length} reaction{reactions.length > 1 ? "s" : ""}
                     </span>
                   </div>
@@ -248,20 +362,20 @@ export default function FeedPage() {
               )}
 
               {/* Info */}
-              <div className="p-3 pt-1 space-y-2">
+              <div className="p-4 pt-2 space-y-3">
                 <div>
-                  <h3 className="font-semibold text-base">
+                  <h3 className="font-semibold text-lg text-gray-900">
                     {log.dishNameVi || log.dishName || "Món ăn"}
                   </h3>
                   {log.dishNameVi && log.dishName && (
-                    <p className="text-xs text-muted-foreground">{log.dishName}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">{log.dishName}</p>
                   )}
                 </div>
 
                 {log.locationName && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="w-3 h-3" />
-                    {log.locationName}
+                  <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                    <MapPin className="w-4 h-4" />
+                    <span>{log.locationName}</span>
                   </div>
                 )}
 
@@ -270,14 +384,14 @@ export default function FeedPage() {
                   const tags = log.tags as string[] | null;
                   if (!tags || !Array.isArray(tags) || tags.length === 0) return null;
                   return (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {tags.slice(0, 5).map((tag: string, i: number) => (
                         <Badge
                           key={i}
                           variant="secondary"
-                          className="text-[10px] px-2 py-0.5 bg-sage-light text-sage-dark border-0"
+                          className="text-xs px-3 py-1 bg-sage/20 text-sage-dark font-medium rounded-full border-0"
                         >
-                          {tag}
+                          #{tag}
                         </Badge>
                       ))}
                     </div>
@@ -285,7 +399,7 @@ export default function FeedPage() {
                 })()}
 
                 {log.voiceNote && (
-                  <p className="text-xs text-muted-foreground italic">"{log.voiceNote}"</p>
+                  <p className="text-sm text-gray-500 italic border-l-2 border-terracotta pl-3">"{log.voiceNote}"</p>
                 )}
               </div>
             </Card>
